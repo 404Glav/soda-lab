@@ -840,24 +840,37 @@ function dateLabel(ts) {
 
 /* ───────────── mix ───────────── */
 
+/* Everything the mixer shows that is derived from the mix itself. */
+function deriveMix(mix) {
+  const fs = mix.flavors.map(flavorById).filter(Boolean);
+  return {
+    color: blendColor(mix),
+    name:  makeName(mix),
+    sub:   fs.length
+      ? `${baseById(mix.base).name} · ${fs.map(f => f.name).join(', ')}`
+      : `${baseById(mix.base).name} · no flavors yet`,
+    flavors: fs,
+    fill:  fs.length ? .82 : .62,
+  };
+}
+
 function renderMix() {
   const mix = state.mix;
-  const color = blendColor(mix);
-  const fs = mix.flavors.map(flavorById).filter(Boolean);
+  const derived = deriveMix(mix);
+  const color = derived.color;
+  const fs = derived.flavors;
 
   $('#mixWash').style.background = `
     radial-gradient(52% 48% at 50% 40%, ${rgba(color, .34)} 0%, ${rgba(color, .10)} 52%, transparent 74%),
     radial-gradient(40% 42% at 24% 62%, ${rgba(lighten(color,.3), .30)} 0%, transparent 70%)`;
 
   $('#mixBottle').innerHTML = bottleStage({
-    color, fill: fs.length ? .82 : .62, fizz: mix.fizz, seed: 21,
+    color, fill: derived.fill, fizz: mix.fizz, seed: 21,
     finish: mix.finish, charms: mix.charms,
   });
 
-  $('#mixName').textContent = makeName(mix);
-  $('#mixSub').textContent = fs.length
-    ? `${baseById(mix.base).name} · ${fs.map(f => f.name).join(', ')}`
-    : `${baseById(mix.base).name} · no flavors yet`;
+  $('#mixName').textContent = derived.name;
+  $('#mixSub').textContent = derived.sub;
 
   // base options
   $('#baseRow').innerHTML = BASES.map(b => `
@@ -1726,19 +1739,13 @@ document.addEventListener('click', e => {
 // sliders
 ['sweet', 'fizz'].forEach(kind => {
   const el = $(`#${kind}Range`);
+  // input: recompute and redraw everything derived (name, color, glow, both dials, button)
   el.addEventListener('input', () => {
     state.mix[kind] = Number(el.value);
-    syncDial(kind);
-    const color = blendColor(state.mix);
-    $('#mixBottle').innerHTML = bottleStage({
-      color, fill: state.mix.flavors.length ? .82 : .62, fizz: state.mix.fizz, seed: 21,
-      finish: state.mix.finish, charms: state.mix.charms,
-    });
-    const btn = $('#brewBtn');
-    if (state.mix.flavors.length) btn.style.background = color;
-    btn.style.color = state.mix.flavors.length ? readableOn(color) : '#fff';
-    persist();
+    renderMix();
   });
+  // change: fires once when the drag ends (or per key press) — save then
+  el.addEventListener('change', persist);
 });
 
 $('#brewBtn').addEventListener('click', startBrew);

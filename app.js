@@ -1945,4 +1945,8 @@ bootRoute();
 navState = { v: state.view, depth: 0, root: state.view };
 history.replaceState(navState, '', location.pathname + location.search + '#/' + state.view);
 
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+
 })();

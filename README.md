@@ -10,7 +10,9 @@ SodaLab/
 ├── styles.css     the whole design system (tokens, cards, sheets, motion)
 ├── app.js         flavor data, color blending, bottle renderer, router
 ├── manifest.json  installable / standalone metadata
-└── icon.svg
+├── sw.js          cache-first offline shell (bump CACHE when files change)
+├── icon.svg
+└── icons/         PNG app icons (180 apple-touch, 192, 512, maskable 512)
 ```
 
 ## Run it

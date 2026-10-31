@@ -8,10 +8,12 @@ An iOS-flavoured soda-mixing app: pick a base, stack up to three flavors, dress 
 SodaLab/
 ├── index.html     markup for the screens + overlays
 ├── styles.css     the whole design system (tokens, cards, sheets, motion)
+├── version.js     version source of truth (page + service worker)
 ├── badges.js      badge definitions, badge store, evaluator (no UI)
 ├── app.js         flavor data, color blending, bottle renderer, router
 ├── manifest.json  installable / standalone metadata
-├── sw.js          cache-first offline shell (bump CACHE when files change)
+├── sw.js          cache-first offline shell (cache name follows version.js)
+├── CHANGELOG.md
 └── icons/         favicons (ico, 16, 32), apple-touch 180, PWA 192/512 + maskable 512;
                    badges/ holds Pixel's badge caps (<id>.svg, <id>-locked.svg, mystery.svg)
 ```
@@ -106,3 +108,12 @@ rarity, finish and charms.
 - The bottle is one SVG: a depth gradient in the liquid, a left highlight, a rim
   catch, a ridged cap, and a colored contact shadow. Finishes and charms sit on
   top of that, never inside the flavor math.
+
+## Releasing
+
+`version.js` is the only version number. Versions are two-part, `MAJOR.MINOR`, with no patch number: `0.1`, `0.2`, `0.3`, `0.4`, then `0.5`. The page and the service worker both read `SODALAB_VERSION`, and the worker caches the shell as `sodalab-` plus that version (`sodalab-0.4` today). On activate it deletes older `sodalab-*` caches, so you do not edit a cache name by hand.
+
+1. Bump `version.js` to the next two-part version (`0.5`, `0.6`, and so on).
+2. Add a `CHANGELOG.md` entry for that version.
+3. Merge to `main`.
+4. Tag `vX.Y` on `main` (`v0.4`, `v0.5`, and so on).

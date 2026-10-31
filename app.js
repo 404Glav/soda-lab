@@ -713,10 +713,34 @@ const TAB_VIEWS = ['home', 'shelf', 'flavors'];
 
 /* ───────────── router ───────────── */
 
-function go(name, dir = 'push') {
+/* History: every screen change writes #/<view> and a state of
+   { v: view, depth: entries pushed since boot, root: view at depth 0 }.
+   Tab-to-tab moves (except leaving the Lab) replace instead of push, so the
+   phone's back button walks back through screens, not every tab tap. */
+const VIEW_RE = /^#\/(home|shelf|flavors|mix|result)\b/;
+const viewFromHash = () => (location.hash.match(VIEW_RE) || [])[1] || null;
+let navState = { v: 'home', depth: 0, root: 'home' };
+
+function writeHistory(name, mode) {
+  if (mode === 'none') return;
+  navState = mode === 'push'
+    ? { v: name, depth: navState.depth + 1, root: navState.root }
+    : { v: name, depth: navState.depth, root: navState.depth ? navState.root : name };
+  const url = location.pathname + location.search + '#/' + name;
+  if (mode === 'push') history.pushState(navState, '', url);
+  else history.replaceState(navState, '', url);
+}
+
+function historyModeFor(from, to) {
+  return TAB_VIEWS.includes(from) && TAB_VIEWS.includes(to) && from !== 'home' ? 'replace' : 'push';
+}
+
+/* go(name, dir = 'push' | 'pop' | 'fade', { history: 'push' | 'replace' | 'none' }) */
+function go(name, dir = 'push', opts = {}) {
   const next = document.querySelector(`.view[data-view="${name}"]`);
   const cur  = document.querySelector('.view.is-active');
   if (!next || next === cur) return;
+  writeHistory(name, opts.history || historyModeFor(state.view, name));
 
   const enterCls = dir === 'fade' ? 'enter-fade' : dir === 'pop' ? 'enter-left' : 'enter-right';
   next.classList.add(enterCls);
@@ -743,7 +767,42 @@ function updateTabs(name = state.view) {
   $$('.tab').forEach(t => t.classList.toggle('is-active', t.dataset.go === name));
 }
 
-function back() { go('home', 'pop'); }
+/* In-app back (and the Lab tab) returns to the lab. If the lab is the root of
+   our history, unwind to it so the phone's back button doesn't land on the
+   screens we just left; otherwise replace the current entry. */
+function back(dir = 'pop') {
+  if (state.view === 'home') return;
+  if (navState.depth > 0 && navState.root === 'home') history.go(-navState.depth);
+  else go('home', dir, { history: 'replace' });
+}
+
+function overlayOpen() {
+  const deco = $('#decoLayer');
+  if (sheetLayer.classList.contains('is-open')) return 'sheet';
+  if (deco && deco.classList.contains('is-open')) return 'deco';
+  if (brewLayer.classList.contains('is-open')) return 'brew';
+  return null;
+}
+
+window.addEventListener('popstate', e => {
+  // Back with a sheet or Decorate open closes it and keeps the screen: put the
+  // entry we just left back on the stack. Back during a brew is ignored.
+  const overlay = overlayOpen();
+  if (overlay) {
+    if (overlay === 'sheet') closeSheet();
+    if (overlay === 'deco') closeDeco();
+    history.pushState(navState, '', location.pathname + location.search + '#/' + navState.v);
+    return;
+  }
+  let v = (e.state && e.state.v) || viewFromHash() || 'home';
+  if (v === 'result' && !$('#resultBody').children.length) v = 'home';
+  const forward = !!(e.state && e.state.depth > navState.depth);
+  navState = e.state && typeof e.state.depth === 'number'
+    ? e.state
+    : { v, depth: navState.depth, root: navState.root };
+  const tabs = TAB_VIEWS.includes(state.view) && TAB_VIEWS.includes(v);
+  go(v, tabs ? 'fade' : forward ? 'push' : 'pop', { history: 'none' });
+});
 
 document.addEventListener('click', e => {
   const goEl = e.target.closest('[data-go]');
@@ -752,6 +811,8 @@ document.addEventListener('click', e => {
     const target = goEl.dataset.go;
     if (target === 'mix' && state.view !== 'mix') {
       go('mix', 'push');
+    } else if (target === 'home') {
+      back(TAB_VIEWS.includes(state.view) ? 'fade' : 'pop');
     } else if (TAB_VIEWS.includes(target)) {
       go(target, TAB_VIEWS.includes(state.view) ? 'fade' : 'pop');
     } else {
@@ -1837,11 +1898,10 @@ function bootRoute() {
       }, mix);
     }
     renderResult(sanitizeBatch(batch), !state.lastBatch);
-    go('result', 'fade');
+    go('result', 'fade', { history: 'none' });
     return true;
   }
-  if (v === 'mix') { go('mix', 'fade'); return true; }
-  go(v, 'fade');
+  go(v, 'fade', { history: 'none' });
   return true;
 }
 
@@ -1864,5 +1924,7 @@ renderMix();
 updateTabs('home');
 initDeco();
 bootRoute();
+navState = { v: state.view, depth: 0, root: state.view };
+history.replaceState(navState, '', location.pathname + location.search + '#/' + state.view);
 
 })();

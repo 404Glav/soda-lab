@@ -67,7 +67,7 @@ const BADGES = [
     on: BREWS, check: c => hasBatch(c) && rank(c.batch.rarity) >= rank('rare') },
   { id:'epic-find', name:'Epic Find', how:'Roll Epic or better', tier:'rare', theme:'rarity', hidden:false, icon:'epic-find', short:'Roll Epic+', retro:'shelf',
     on: BREWS, check: c => hasBatch(c) && rank(c.batch.rarity) >= rank('epic') },
-  { id:'legend-in-a-bottle', name:'Legend in a Bottle', how:'Roll Legendary or better', tier:'epic', theme:'rarity', hidden:false, icon:'legend-in-a-bottle', short:'Roll Legendary+', retro:'shelf',
+  { id:'legend-in-a-bottle', name:'Legend in a Bottle', how:'Roll Legendary or better', tier:'legendary', theme:'rarity', hidden:false, icon:'legend-in-a-bottle', short:'Roll Legendary+', retro:'shelf',
     on: BREWS, check: c => hasBatch(c) && rank(c.batch.rarity) >= rank('legendary') },
   { id:'mythic', name:'Mythic', how:'Roll a Mythic', tier:'mythic', theme:'rarity', hidden:true, hint:'Rarer than rare. Finishes, charms and merges tilt the odds.', icon:'mythic', retro:'shelf',
     on: BREWS, check: c => hasBatch(c) && c.batch.rarity === 'mythic' },

@@ -108,46 +108,22 @@ const FIZZ_ADJ    = ['still','soft','gentle','crisp','lively','wild'];
 
 const CURATED = ['cola','cherry','lemon','lime','orange','grape','cream','rootbeer'];
 
-/* ───────────── rarities, finishes, charms ───────────── */
+/* ───────────── mix rules ───────────── */
 
-const RARITY = [
-  { id:'common',    name:'Common',    weight:50,   color:'#8E8E93', stars:1, odds:'1 in 2' },
-  { id:'uncommon',  name:'Uncommon',  weight:27,   color:'#2E9E63', stars:2, odds:'1 in 4' },
-  { id:'rare',      name:'Rare',      weight:14,   color:'#2E7BD6', stars:3, odds:'1 in 7' },
-  { id:'epic',      name:'Epic',      weight:6.5,  color:'#9B4FD6', stars:4, odds:'1 in 15' },
-  { id:'legendary', name:'Legendary', weight:2,    color:'#D69A22', stars:5, odds:'1 in 50' },
-  { id:'mythic',    name:'Mythic',    weight:.5,   color:'#D6457C', stars:6, odds:'1 in 200' },
+/* Each flavor slider is its own 0–100 strength; 0 is off. A dose is that
+   share of the flavor's max shot. When the doses overflow the cup they all
+   scale down by one factor, so the ratios (the mix shares) never change. */
+const CUP_ROOM = 180;          // ml of flavor the cup holds
+const DEFAULT_MAX_SHOT = 30;   // ml a flavor pours at slider 100
+const maxShotOf = f => (f && f.maxShot) || DEFAULT_MAX_SHOT;
+
+const FIZZ_LABELS = [
+  { label:'Flat',       max:0   },
+  { label:'Light',      max:33  },
+  { label:'Regular',    max:66  },
+  { label:'Extra fizz', max:100 },
 ];
-
-const FINISHES = [
-  { id:'none',    name:'Clear',   sub:'Clean glass',        swatch:'#E8EEF1', luck:0,   desc:'Nothing added. Just the drink.' },
-  { id:'glitter', name:'Glitter', sub:'Gold dust',          swatch:'#E8C25A', luck:.05, desc:'Edible gold dust, suspended and turning.' },
-  { id:'pearl',   name:'Pearl',   sub:'Iridescent swirl',   swatch:'#DCC9EC', luck:.06, desc:'A soft mother-of-pearl shimmer.' },
-  { id:'aurora',  name:'Aurora',  sub:'Polar lights',       swatch:'#6FD3B0', luck:.07, desc:'Green and violet ribbons, slow as a night sky.' },
-  { id:'cosmic',  name:'Cosmic',  sub:'Bottled nebula',     swatch:'#5B4B9E', luck:.08, desc:'A small galaxy, carbonated.' },
-  { id:'ember',   name:'Ember',   sub:'Warm sparks',        swatch:'#E2703A', luck:.07, desc:'Sparks that drift up and never burn.' },
-];
-
-const CHARMS = [
-  { id:'star',   name:'Star',    art:'<path d="M12 2.5l2.6 5.7 6.2.7-4.6 4.3 1.3 6.1L12 16.2l-5.5 3.1 1.3-6.1L3.2 8.9l6.2-.7z" fill="#F5C542" stroke="#B8860B" stroke-width=".8" stroke-linejoin="round"/><circle cx="9.2" cy="8.4" r=".9" fill="#FFF6D0"/>' },
-  { id:'heart',  name:'Heart',   art:'<path d="M12 20s-7.4-4.6-7.4-9.4A4.1 4.1 0 0 1 12 7.4a4.1 4.1 0 0 1 7.4 3.2C19.4 15.4 12 20 12 20Z" fill="#F26D8E" stroke="#C23A5C" stroke-width=".8"/><ellipse cx="9" cy="10.4" rx="1.5" ry="1" fill="#FFD3DE" opacity=".8"/>' },
-  { id:'cherry', name:'Cherry',  art:'<path d="M12 7c0-2 1.4-3.4 3.2-4" fill="none" stroke="#4F8A3A" stroke-width="1.2" stroke-linecap="round"/><path d="M12 7c-1-1.6-2.6-2.2-4-2" fill="none" stroke="#4F8A3A" stroke-width="1.2" stroke-linecap="round"/><circle cx="8.4" cy="14.4" r="3.5" fill="#D62F4A" stroke="#9E1B33" stroke-width=".8"/><circle cx="15.4" cy="15.4" r="3.2" fill="#E8425C" stroke="#9E1B33" stroke-width=".8"/><circle cx="7.4" cy="13.2" r="1" fill="#FF9AA8" opacity=".9"/>' },
-  { id:'flower', name:'Flower',  art:'<g fill="#FFF6F8" stroke="#E7C6D2" stroke-width=".6"><circle cx="12" cy="5.6" r="3"/><circle cx="18" cy="10" r="3"/><circle cx="15.7" cy="17.2" r="3"/><circle cx="8.3" cy="17.2" r="3"/><circle cx="6" cy="10" r="3"/></g><circle cx="12" cy="12" r="2.8" fill="#F5C542"/>' },
-  { id:'moon',   name:'Moon',    art:'<path d="M16.6 3.6a8.6 8.6 0 1 0 4.2 13.6A9.2 9.2 0 0 1 16.6 3.6Z" fill="#F0D27A" stroke="#C9A43F" stroke-width=".8"/><path d="M18.4 4.6l.7 1.5 1.6.2-1.2 1.1.3 1.6-1.4-.8-1.4.8.3-1.6-1.2-1.1 1.6-.2z" fill="#FFF3C4"/>' },
-  { id:'shell',  name:'Shell',   art:'<path d="M12 20c-4.8 0-8-3.2-8-7.2C4 8.6 7.4 4 12 4s8 4.6 8 8.8c0 4-3.2 7.2-8 7.2Z" fill="#F7B9A0" stroke="#C97E63" stroke-width=".8"/><path d="M12 20V5M8.6 19.2 9.6 6M15.4 19.2 14.4 6M5.6 16.6 7.4 7.4M18.4 16.6 16.6 7.4" fill="none" stroke="#D99276" stroke-width=".7" stroke-linecap="round"/>' },
-  { id:'bow',    name:'Bow',     art:'<path d="M12 12 5 8.4c-1.4-.7-2.4.2-2.4 1.8 0 1.7 1.1 3.4 2.6 3.9L12 12Zm0 0 7-3.6c1.4-.7 2.4.2 2.4 1.8 0 1.7-1.1 3.4-2.6 3.9L12 12Z" fill="#F27BA4" stroke="#C24570" stroke-width=".8" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.2" fill="#F7A6C0" stroke="#C24570" stroke-width=".8"/>' },
-  { id:'bolt',   name:'Bolt',    art:'<path d="M13.6 2.5 5.2 13.2h5.1l-1.4 8.3 8.9-11.2h-5.3z" fill="#F7C948" stroke="#C79A1E" stroke-width=".8" stroke-linejoin="round"/>' },
-  { id:'clover', name:'Clover',  art:'<g fill="#5FAE4A" stroke="#3C7D2C" stroke-width=".6"><circle cx="12" cy="7.6" r="3.4"/><circle cx="16.4" cy="12" r="3.4"/><circle cx="12" cy="16.4" r="3.4"/><circle cx="7.6" cy="12" r="3.4"/></g><path d="M12 15c.4 2.4-.4 4.4-2 5.8" fill="none" stroke="#3C7D2C" stroke-width="1.1" stroke-linecap="round"/>' },
-  { id:'gem',    name:'Gem',     art:'<path d="M12 3.4 20 9.4l-8 11.2L4 9.4Z" fill="#6FD8E8" stroke="#2E9BAF" stroke-width=".8" stroke-linejoin="round"/><path d="M4 9.4h16M12 3.4 8.6 9.4 12 20.6l3.4-11.2z" fill="none" stroke="#B9F2FA" stroke-width=".7" opacity=".85"/>' },
-  { id:'pearl',  name:'Pearl',   art:'<circle cx="12" cy="12" r="8" fill="#F3EEF8"/><circle cx="12" cy="12" r="8" fill="none" stroke="#C9C2D6" stroke-width=".7"/><ellipse cx="9.2" cy="8.8" rx="2.8" ry="1.9" fill="#FFF" opacity=".8"/><ellipse cx="14.6" cy="15.2" rx="2" ry="1.2" fill="#E7D8F2" opacity=".7"/>' },
-  { id:'planet', name:'Planet',  art:'<circle cx="12" cy="11.6" r="6.4" fill="#6E93D8"/><circle cx="10" cy="9.4" r="2.2" fill="#A8C2F2" opacity=".8"/><ellipse cx="12" cy="12.4" rx="10.2" ry="2.6" fill="none" stroke="#E9C77A" stroke-width="1.4" transform="rotate(-18 12 12.4)"/>' },
-];
-
-const MAX_CHARMS = 6;   // one limit for placing, merging, rarity luck and score
-
-const charmById = id => CHARMS.find(c => c.id === id);
-const finishById = id => FINISHES.find(f => f.id === id) || FINISHES[0];
-const rarityById = id => RARITY.find(r => r.id === id) || RARITY[0];
+const fizzLabel = v => (FIZZ_LABELS.find(l => v <= l.max) || FIZZ_LABELS[FIZZ_LABELS.length - 1]).label;
 
 
 /* ───────────── color utils ───────────── */
@@ -232,60 +208,93 @@ const fname      = id => (flavorById(id) || { name: 'Unknown' }).name;
 
 const BASE_ACCENT = { soda:'#8FCFE0', tonic:'#B4D6A4', mineral:'#C6D4D9', cream:'#E8CFA4' };
 
+/* ───────────── dose math ─────────────
+   dose  = slider/100 × the flavor's max shot
+   fit   = one factor for every shot when the doses overflow the cup
+   share = a flavor's dose ÷ total dose (always sums to 100%) */
+
+function rawDoses(mix) {
+  return (mix.flavors || []).map(x => {
+    const f = flavorById(x.id);
+    return f ? { id: x.id, f, value: x.value, dose: (x.value / 100) * maxShotOf(f) } : null;
+  }).filter(Boolean);
+}
+
+const rawDoseTotal = mix => rawDoses(mix).reduce((a, x) => a + x.dose, 0);
+const scaledToFit = mix => rawDoseTotal(mix) > CUP_ROOM + 1e-6;
+
+function sharesOf(mix) {
+  const items = rawDoses(mix);
+  const raw = items.reduce((a, x) => a + x.dose, 0);
+  const fit = raw > CUP_ROOM ? CUP_ROOM / raw : 1;
+  const total = raw * fit;
+  return items.map(x => {
+    const dose = x.dose * fit;
+    return { ...x, dose, share: total ? dose / total : 0 };
+  });
+}
+
 function blendColor(mix) {
-  const fs = mix.flavors.map(flavorById).filter(Boolean);
-  if (!fs.length) {
+  const shares = sharesOf(mix);
+  if (!shares.length) {
     const b = baseById(mix.base);
     return mixHex(b.color, BASE_ACCENT[b.id] || BASE_ACCENT.soda, .8);
   }
 
   let x = 0, y = 0, sat = 0, lig = 0;
-  fs.forEach(f => {
+  shares.forEach(({ f, share }) => {
+    const w = Math.max(share, .02);          // a 2% splash still tints the glass
     const { h, s, l } = rgbToHsl(...hexToRgb(f.color));
-    const w = 1;
     x += Math.cos(h * Math.PI / 180) * w;
     y += Math.sin(h * Math.PI / 180) * w;
-    sat += s; lig += l;
+    sat += s * w;
+    lig += l * w;
   });
+  const wsum = shares.reduce((a, s) => a + Math.max(s.share, .02), 0);
   let hue = Math.atan2(y, x) * 180 / Math.PI;
   if (hue < 0) hue += 360;
-  sat /= fs.length; lig /= fs.length;
+  sat /= wsum; lig /= wsum;
 
   const s = clamp(sat * .92 + .14, .48, .92);
-  const l = clamp(lig * .52 + .28 + (mix.sweet - 3) * .012, .44, .63);
+  const l = clamp(lig * .52 + .28, .44, .63);
   return hslToHex(hue, s, l);
 }
 
 function profileOf(mix) {
   const p = { sweet:.20, tart:.12, bitter:.08, spice:.08, herbal:.08 };
-  mix.flavors.map(flavorById).filter(Boolean).forEach(f => {
-    for (const k in p) p[k] += (f.p[k] || 0) * .56;
-  });
-  p.sweet += (mix.sweet - 3) * .07;
-  p.tart  += (mix.fizz - 3) * .015;
+  const shares = sharesOf(mix);
+  const w = shares.reduce((a, s) => a + s.share, 0);
+  if (w > 0) {
+    for (const k in p) {
+      p[k] += shares.reduce((a, s) => a + (s.f.p[k] || 0) * s.share, 0) * .56;
+    }
+  }
+  // fizz nudges tartness a little, on the 0–100 scale
+  p.tart += (mix.fizz - 50) * .00075;
   for (const k in p) p[k] = clamp(p[k], .04, 1);
   return p;
 }
 
 function makeName(mix) {
-  const fs = mix.flavors.map(flavorById).filter(Boolean);
-  if (!fs.length) return 'Plain Sparkle';
+  const shares = sharesOf(mix).sort((a, b) => b.share - a.share);
+  if (!shares.length) return 'Plain Sparkle';
 
-  if (fs.length >= 2) {
-    const key = [fs[0].id, fs[1].id].sort().join('+');
+  if (shares.length >= 2) {
+    const key = [shares[0].id, shares[1].id].sort().join('+');
     if (COMBO_NAMES[key]) return COMBO_NAMES[key];
   }
 
-  const h = hashStr(mix.flavors.join('') + mix.base + mix.sweet + mix.fizz);
+  const h = hashStr(shares.map(s => s.id).join('') + mix.base + mix.fizz);
   const suffix = SUFFIXES[h % SUFFIXES.length];
-  let stem = fs.map(f => f.name).join(' ');
-  if (stem.length > 15 && fs.length > 2) stem = fs.slice(0, 2).map(f => f.name).join(' ');
+  let stem = shares.slice(0, 2).map(s => s.f.name).join(' ');
+  if (stem.length > 15) stem = shares[0].f.name;
   return `${stem} ${suffix}`;
 }
 
 function notesFor(mix) {
   const p = profileOf(mix);
-  const fs = mix.flavors.map(flavorById).filter(Boolean);
+  const shares = sharesOf(mix).sort((a, b) => b.share - a.share);
+  const fs = shares.map(s => s.f);
   const bits = [];
   if (p.sweet > .58) bits.push('a soft, rounded sweetness');
   else if (p.sweet < .32) bits.push('a bone-dry edge');
@@ -304,270 +313,204 @@ function notesFor(mix) {
     ? `${flavorList} over ${baseById(mix.base).name.toLowerCase()}, served ${TEMP_LABEL(mix.temp)}.`
     : `Unflavored ${baseById(mix.base).name.toLowerCase()}, served ${TEMP_LABEL(mix.temp)}.`;
 
-  return `${cap(lead)} ${cap(a)} leads, ${b} follows, and the carbonation stays ${FIZZ_ADJ[mix.fizz]}.`;
+  const fizz = fizzLabel(mix.fizz).toLowerCase();
+  return `${cap(lead)} ${cap(a)} leads, ${b} follows, and the carbonation stays ${fizz}.`;
 }
 
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 const TEMP_LABEL = id => (TEMPS.find(t => t.id === id) || TEMPS[0]).label.toLowerCase();
 
-/* ───────────── the bottle ───────────── */
+/* ───────────── the cup ─────────────
+   A tapered tumbler: wide rim, narrow base, three floating ice cubes, liquid
+   that fills from the bottom, and carbonation that speeds up with fizz.
+   Everything is one SVG so it scales crisply from a 52px shelf thumbnail to
+   the full mixer stage. */
 
-const BODY = 'M74 18 C74 33 84 41 90 57 C96 73 98 86 98 102 L98 210 C98 226 88 234 74 234 L46 234 C32 234 22 226 22 210 L22 102 C22 86 24 73 30 57 C36 41 46 33 46 18 Z';
+const CUP_BODY = 'M16 46 L35.4 230 Q36.2 238 43.2 238 L76.8 238 Q83.8 238 84.6 230 L104 46 Z';
+const CUP_RIM_Y = 46;
+const CUP_FLOOR = 236;
+const CUP_SURFACE_TOP = 58;
+const CUP_SURFACE_BOT = 232;
 let uidCounter = 0;
 
-/* liquid finishes: glitter, pearl, aurora, cosmic, ember */
-function finishLayer(finish, uid, color, surface, still) {
-  if (!finish || finish === 'none') return '';
-  const rnd = mulberry32(420 + hashStr(color + finish));
-  const bottom = 236;
-  // CSS animation hook; still thumbnails get none (the static attributes show instead)
-  const anim = (cls, dur, begin, extra = '') => still ? '' : ` class="${cls}" style="animation-duration:${dur}s;animation-delay:${begin}s${extra}"`;
+const bottleVars = c =>
+  `--l0:${lighten(c, .44)};--l1:${lighten(c, .30)};--l2:${c};--l3:${darken(c, .32)};--l4:${lighten(c, .54)};--l5:${lighten(c, .64)}`;
 
-  if (finish === 'glitter') {
-    let dots = '';
-    for (let i = 0; i < 34; i++) {
-      const x = 24 + rnd() * 72;
-      const y = surface + 8 + rnd() * (bottom - surface - 14);
-      const r = .55 + rnd() * 1.25;
-      const dur = (1.4 + rnd() * 2.6).toFixed(2);
-      const begin = (-rnd() * 3).toFixed(2);
-      dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="#FFF2BE" opacity=".8"${anim('tw', dur, begin, ';--lo:.12;--hi:1')}/>`;
-    }
-    for (let i = 0; i < 7; i++) {
-      const x = 30 + rnd() * 60;
-      const y = surface + 14 + rnd() * (bottom - surface - 26);
-      const s = .8 + rnd() * 1.4;
-      const dur = (2.2 + rnd() * 2.4).toFixed(2);
-      const begin = (-rnd() * 4).toFixed(2);
-      dots += `<path d="M${x} ${y - s * 2.4} L${x + s * .55} ${y - s * .55} L${x + s * 2.4} ${y} L${x + s * .55} ${y + s * .55} L${x} ${y + s * 2.4} L${x - s * .55} ${y + s * .55} L${x - s * 2.4} ${y} L${x - s * .55} ${y - s * .55}Z" fill="#FFF9DC" opacity=".85"${anim('tw', dur, begin, ';--lo:.1;--hi:.95')}/>`;
-    }
-    return dots;
-  }
+/* Half the cup's inner width at a given height (rim 44, base 24). */
+const cupHalfWidth = y => 44 - ((y - CUP_RIM_Y) / (CUP_FLOOR - CUP_RIM_Y)) * 20;
 
-  if (finish === 'pearl') {
-    return `<g opacity=".62">
-      <rect x="-30" y="${surface}" width="180" height="${bottom - surface}" fill="url(#pearl-${uid})"/>
-      <g${anim('pearl-drift', 13, 0)}>
-        <ellipse cx="42" cy="${surface + (bottom - surface) * .32}" rx="34" ry="46" fill="#FFFFFF" opacity=".16"/>
-        <ellipse cx="82" cy="${surface + (bottom - surface) * .66}" rx="30" ry="42" fill="#D9C6FF" opacity=".13"/>
-      </g>
+function iceCube(uid, cx, cy, size, rot, bob, delay) {
+  const h = size / 2;
+  return `<g class="cup-ice-cube" transform="translate(${cx.toFixed(1)} ${cy.toFixed(1)}) rotate(${rot})" style="--bob:${bob.toFixed(2)}px;animation-delay:${delay.toFixed(2)}s">
+      <rect x="${-h}" y="${-h}" width="${size}" height="${size}" rx="${(size * .26).toFixed(1)}" fill="url(#ice-${uid})"/>
+      <rect x="${-h}" y="${-h}" width="${size}" height="${size}" rx="${(size * .26).toFixed(1)}" fill="none" stroke="#fff" stroke-opacity=".62" stroke-width=".9"/>
+      <rect x="${(-h + 2.6).toFixed(1)}" y="${(-h + 2.6).toFixed(1)}" width="${(size * .4).toFixed(1)}" height="${(size * .4).toFixed(1)}" rx="${(size * .13).toFixed(1)}" fill="#fff" opacity=".38"/>
+      <path d="M${(-h + 3).toFixed(1)} ${(h - 3).toFixed(1)} L${(-h + 3).toFixed(1)} ${(-h + 3).toFixed(1)}" stroke="#fff" stroke-opacity=".5" stroke-width="1.1" stroke-linecap="round"/>
     </g>`;
-  }
-
-  if (finish === 'aurora') {
-    const y1 = surface + (bottom - surface) * .28;
-    const y2 = surface + (bottom - surface) * .52;
-    const y3 = surface + (bottom - surface) * .76;
-    return `<g opacity=".72">
-      <g${anim('aurora-drift', 9, 0)}>
-        <path d="M-20 ${y1} C 18 ${y1 - 26}, 46 ${y1 + 28}, 82 ${y1 + 2} S 128 ${y1 - 18}, 150 ${y1 + 6} L150 ${bottom} L-20 ${bottom}Z" fill="url(#aur-a-${uid})"/>
-        <path d="M-20 ${y2} C 24 ${y2 + 20}, 54 ${y2 - 24}, 90 ${y2 + 4} S 132 ${y2 + 22}, 150 ${y2 - 4} L150 ${bottom} L-20 ${bottom}Z" fill="url(#aur-b-${uid})" opacity=".8"/>
-        <path d="M-20 ${y3} C 20 ${y3 - 16}, 52 ${y3 + 22}, 86 ${y3 - 2} S 130 ${y3 - 18}, 150 ${y3 + 8} L150 ${bottom} L-20 ${bottom}Z" fill="url(#aur-c-${uid})" opacity=".7"/>
-      </g>
-    </g>`;
-  }
-
-  if (finish === 'cosmic') {
-    let stars = '';
-    for (let i = 0; i < 26; i++) {
-      const x = 22 + rnd() * 76;
-      const y = surface + 6 + rnd() * (bottom - surface - 12);
-      const r = .35 + rnd() * 1.05;
-      const dur = (1.8 + rnd() * 3.2).toFixed(2);
-      const begin = (-rnd() * 4).toFixed(2);
-      stars += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="#FFFFFF" opacity=".9"${anim('tw', dur, begin, ';--lo:.15;--hi:.95')}/>`;
-    }
-    return `<g>
-      <rect x="0" y="${surface}" width="120" height="${bottom - surface}" fill="#141029" opacity=".5"/>
-      <ellipse cx="44" cy="${surface + (bottom - surface) * .38}" rx="46" ry="54" fill="url(#neb-a-${uid})" opacity=".85"/>
-      <ellipse cx="86" cy="${surface + (bottom - surface) * .7}" rx="40" ry="46" fill="url(#neb-b-${uid})" opacity=".7"/>
-      <g${anim('spin', 46, 0, `;transform-origin:60px ${(surface + bottom) / 2}px`)}>
-        <ellipse cx="60" cy="${(surface + bottom) / 2}" rx="46" ry="18" fill="none" stroke="#B9A6FF" stroke-width="5" opacity=".12" transform="rotate(-24 60 ${(surface + bottom) / 2})"/>
-      </g>
-      ${stars}
-    </g>`;
-  }
-
-  if (finish === 'ember') {
-    let sparks = '';
-    for (let i = 0; i < 16; i++) {
-      const x = 26 + rnd() * 68;
-      const y = surface + 10 + rnd() * (bottom - surface - 20);
-      const r = .8 + rnd() * 1.7;
-      const dur = (3 + rnd() * 3.4).toFixed(2);
-      const begin = (-rnd() * 5).toFixed(2);
-      sparks += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="#FFB15C" opacity=".8"${anim('spark', dur, begin, `;--dy:${(surface + 4 - y).toFixed(1)}px`)}/>`;
-    }
-    return `<g><rect x="0" y="${surface}" width="120" height="${bottom - surface}" fill="url(#ember-${uid})" opacity=".35"/>${sparks}</g>`;
-  }
-
-  return '';
 }
 
-const bottleVars = c =>
-  `--l0:${lighten(c, .42)};--l1:${lighten(c, .30)};--l2:${c};--l3:${darken(c, .36)};--l4:${lighten(c, .52)};--l5:${lighten(c, .6)}`;
-
 function bottleSVG(opts) {
-  const o = Object.assign({ color:'#9BD3E8', fill:.78, fizz:3, seed:1, animate:false, cls:'', finish:'none', still:false }, opts);
-  const uid = 'v' + (++uidCounter);
+  const o = Object.assign({ color:'#9BD3E8', fill:.78, fizz:50, seed:1, animate:false, cls:'', still:false }, opts);
+  const uid = 'c' + (++uidCounter);
   const color = o.color;
-  const surface = Math.round(226 - clamp(o.fill, .04, .94) * 168);
-  const rx = clamp(30 + (surface - 58) / 44 * 7, 27, 37);
-  const rise = -(226 - surface);
-
+  const fill = clamp(o.fill, .08, 1);
+  const surface = CUP_SURFACE_BOT - fill * (CUP_SURFACE_BOT - CUP_SURFACE_TOP);
+  const rx = cupHalfWidth(surface) - 1.4;
+  const rise = -(CUP_SURFACE_BOT - surface);
   const rnd = mulberry32(o.seed || 1);
-  const count = o.fizz <= 0 ? 0 : Math.round((o.still ? 3 : 5) + o.fizz * (o.still ? 2.2 : 4.2));
+
+  // Fizz 0–100: 0 pours flat, 100 is a fast rolling boil.
+  const fizz = clamp(o.fizz, 0, 100);
+  const count = fizz <= 0 ? 0 : Math.round((fizz / 100) * (o.still ? 14 : 30));
   let bubbles = '';
   for (let i = 0; i < count; i++) {
-    const cx = 30 + rnd() * 60;
-    const cy = 220 + rnd() * 10;
-    const r = 1 + rnd() * (o.still ? 1.6 : 2.2);
-    const dur = 2.1 + rnd() * 2.6;
+    const cx = 38 + rnd() * 44;
+    const cy = 228 + rnd() * 8;
+    const r = .8 + rnd() * (o.still ? 1.3 : 1.9);
+    const dur = (3.9 - (fizz / 100) * 2.2) + rnd() * 1.2;
     const delay = -rnd() * dur;
-    bubbles += `<circle class="bub" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(2)}" style="--rise:${rise}px;animation-duration:${dur.toFixed(2)}s;animation-delay:${delay.toFixed(2)}s"/>`;
+    bubbles += `<circle class="bub" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(2)}" style="--rise:${rise.toFixed(1)}px;animation-duration:${dur.toFixed(2)}s;animation-delay:${delay.toFixed(2)}s"/>`;
   }
 
-  const offset = o.animate ? (250 - surface) : 0;
-  const finish = finishLayer(o.finish, uid, color, surface, o.still);
-  const capRidges = [44.5, 48.5, 52.5, 56.5, 60.5, 64.5, 68.5, 72.5, 76.5]
-    .map(x => `<line x1="${x}" y1="6.4" x2="${x}" y2="18.4"/>`).join('');
+  // Ice sits just under the surface, never below the floor.
+  const iceTop = Math.min(surface + 6, 176);
+  const cubes = [
+    iceCube(uid, 45, iceTop + 8,  26, -15, 2.6, 0),
+    iceCube(uid, 72, iceTop + 18, 22,  13, 2.1, -.9),
+    iceCube(uid, 57, iceTop + 33, 18,  -6, 2.4, -1.7),
+  ].join('');
 
-  return `<svg class="bottle ${o.cls} ${o.still ? 'bottle--still' : ''}" viewBox="0 0 120 250" role="img" aria-label="A bottle of soda" style="${bottleVars(color)}">
+  // Pour animation: the liquid group starts below the floor and slides up.
+  const offset = o.animate ? (CUP_FLOOR + 20 - surface) : 0;
+
+  return `<svg class="bottle cup ${o.cls} ${o.still ? 'bottle--still' : ''}" viewBox="0 0 120 260" role="img" aria-label="A cup of soda" style="${bottleVars(color)}">
     <defs>
-      <clipPath id="bc-${uid}"><path d="${BODY}"/></clipPath>
-      <clipPath id="lc-${uid}"><rect x="0" y="${surface}" width="120" height="${252 - surface}"/></clipPath>
-      <linearGradient id="lg-${uid}" x1=".12" y1="0" x2=".86" y2="1">
+      <clipPath id="cup-${uid}"><path d="${CUP_BODY}"/></clipPath>
+      <clipPath id="liq-${uid}"><rect x="0" y="${surface.toFixed(1)}" width="120" height="${(CUP_FLOOR + 4 - surface).toFixed(1)}"/></clipPath>
+      <linearGradient id="lg-${uid}" x1=".1" y1="0" x2=".9" y2="1">
         <stop offset="0" style="stop-color:var(--l0)"/>
-        <stop offset=".2" style="stop-color:var(--l1)"/>
-        <stop offset=".62" style="stop-color:var(--l2)"/>
+        <stop offset=".22" style="stop-color:var(--l1)"/>
+        <stop offset=".64" style="stop-color:var(--l2)"/>
         <stop offset="1" style="stop-color:var(--l3)"/>
       </linearGradient>
-      <linearGradient id="dp-${uid}" x1="0" y1="${surface}" x2="0" y2="236" gradientUnits="userSpaceOnUse">
+      <linearGradient id="dp-${uid}" x1="0" y1="${surface.toFixed(1)}" x2="0" y2="${CUP_FLOOR}" gradientUnits="userSpaceOnUse">
         <stop offset="0" stop-color="#000" stop-opacity="0"/>
-        <stop offset=".55" stop-color="#000" stop-opacity=".08"/>
-        <stop offset="1" stop-color="#000" stop-opacity=".34"/>
+        <stop offset=".5" stop-color="#000" stop-opacity=".07"/>
+        <stop offset="1" stop-color="#000" stop-opacity=".32"/>
       </linearGradient>
-      <linearGradient id="gl-${uid}" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0" stop-color="#fff" stop-opacity=".52"/>
-        <stop offset=".07" stop-color="#fff" stop-opacity=".15"/>
-        <stop offset=".28" stop-color="#fff" stop-opacity=".03"/>
-        <stop offset=".62" stop-color="#fff" stop-opacity="0"/>
-        <stop offset=".88" stop-color="#fff" stop-opacity=".11"/>
-        <stop offset="1" stop-color="#fff" stop-opacity=".48"/>
+      <radialGradient id="core-${uid}" cx=".46" cy=".5" r=".62">
+        <stop offset="0" stop-color="#fff" stop-opacity=".30"/>
+        <stop offset=".55" stop-color="#fff" stop-opacity=".06"/>
+        <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="glass-${uid}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#fff" stop-opacity=".58"/>
+        <stop offset=".09" stop-color="#fff" stop-opacity=".16"/>
+        <stop offset=".3" stop-color="#fff" stop-opacity=".02"/>
+        <stop offset=".68" stop-color="#fff" stop-opacity="0"/>
+        <stop offset=".9" stop-color="#fff" stop-opacity=".12"/>
+        <stop offset="1" stop-color="#fff" stop-opacity=".52"/>
       </linearGradient>
-      <radialGradient id="in-${uid}" cx=".5" cy=".5" r=".62">
-        <stop offset=".52" stop-color="#000" stop-opacity="0"/>
-        <stop offset=".84" stop-color="#000" stop-opacity=".10"/>
-        <stop offset="1" stop-color="#000" stop-opacity=".24"/>
+      <radialGradient id="in-${uid}" cx=".5" cy=".5" r=".64">
+        <stop offset=".5" stop-color="#000" stop-opacity="0"/>
+        <stop offset=".86" stop-color="#000" stop-opacity=".09"/>
+        <stop offset="1" stop-color="#000" stop-opacity=".22"/>
       </radialGradient>
       <linearGradient id="hl-${uid}" x1="0" y1="0" x2="1" y2="0">
         <stop offset="0" stop-color="#fff" stop-opacity="0"/>
-        <stop offset=".5" stop-color="#fff" stop-opacity=".62"/>
+        <stop offset=".5" stop-color="#fff" stop-opacity=".7"/>
         <stop offset="1" stop-color="#fff" stop-opacity="0"/>
       </linearGradient>
-      <linearGradient id="cap-${uid}" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0" stop-color="#3C3C45"/>
-        <stop offset=".16" stop-color="#1A1A20"/>
-        <stop offset=".5" stop-color="#0B0B0E"/>
-        <stop offset=".8" stop-color="#26262E"/>
-        <stop offset="1" stop-color="#41414B"/>
+      <linearGradient id="ice-${uid}" x1=".1" y1="0" x2=".9" y2="1">
+        <stop offset="0" stop-color="#FFFFFF" stop-opacity=".92"/>
+        <stop offset=".45" stop-color="#EAF7FF" stop-opacity=".72"/>
+        <stop offset="1" stop-color="#CFE9F7" stop-opacity=".58"/>
       </linearGradient>
-      <linearGradient id="pearl-${uid}" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#FFD1E8"/>
-        <stop offset=".28" stop-color="#CFE8FF"/>
-        <stop offset=".52" stop-color="#D8FFE9"/>
-        <stop offset=".76" stop-color="#FFF0C9"/>
-        <stop offset="1" stop-color="#E4D2FF"/>
-      </linearGradient>
-      <linearGradient id="aur-a-${uid}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#6FF0C4" stop-opacity=".78"/>
-        <stop offset=".55" stop-color="#6FF0C4" stop-opacity=".16"/>
-        <stop offset="1" stop-color="#6FF0C4" stop-opacity="0"/>
-      </linearGradient>
-      <linearGradient id="aur-b-${uid}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#9C7BFF" stop-opacity=".72"/>
-        <stop offset=".55" stop-color="#9C7BFF" stop-opacity=".14"/>
-        <stop offset="1" stop-color="#9C7BFF" stop-opacity="0"/>
-      </linearGradient>
-      <linearGradient id="aur-c-${uid}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#67C8FF" stop-opacity=".68"/>
-        <stop offset=".55" stop-color="#67C8FF" stop-opacity=".12"/>
-        <stop offset="1" stop-color="#67C8FF" stop-opacity="0"/>
-      </linearGradient>
-      <radialGradient id="neb-a-${uid}" cx=".5" cy=".5" r=".5">
-        <stop offset="0" stop-color="#8E6BFF" stop-opacity=".9"/>
-        <stop offset=".55" stop-color="#5B3DB8" stop-opacity=".45"/>
-        <stop offset="1" stop-color="#5B3DB8" stop-opacity="0"/>
+      <radialGradient id="rim-${uid}" cx=".5" cy=".5" r=".5">
+        <stop offset=".55" style="stop-color:var(--l1)" stop-opacity=".18"/>
+        <stop offset="1" style="stop-color:var(--l3)" stop-opacity=".42"/>
       </radialGradient>
-      <radialGradient id="neb-b-${uid}" cx=".5" cy=".5" r=".5">
-        <stop offset="0" stop-color="#4FA6E8" stop-opacity=".8"/>
-        <stop offset=".6" stop-color="#2B4E9E" stop-opacity=".35"/>
-        <stop offset="1" stop-color="#2B4E9E" stop-opacity="0"/>
-      </radialGradient>
-      <linearGradient id="ember-${uid}" x1="0" y1="1" x2="0" y2="0">
-        <stop offset="0" stop-color="#FF7A2E" stop-opacity=".55"/>
-        <stop offset="1" stop-color="#FFD08A" stop-opacity="0"/>
+      <linearGradient id="sh-${uid}" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#fff" stop-opacity="0"/>
+        <stop offset=".45" stop-color="#fff" stop-opacity=".42"/>
+        <stop offset=".55" stop-color="#fff" stop-opacity=".42"/>
+        <stop offset="1" stop-color="#fff" stop-opacity="0"/>
       </linearGradient>
     </defs>
 
-    <ellipse class="bottle-shadow" cx="60" cy="242.5" rx="35" ry="5.5"/>
-    <ellipse class="bottle-caustic" cx="60" cy="242" rx="26" ry="3.6" style="fill:var(--l2)" opacity=".3"/>
+    <ellipse class="bottle-shadow" cx="60" cy="243" rx="33" ry="5.4"/>
+    <ellipse class="bottle-caustic" cx="60" cy="242.4" rx="24" ry="3.4" style="fill:var(--l2)" opacity=".34"/>
 
-    <g clip-path="url(#bc-${uid})">
-      <g class="liquid" style="transform:translateY(${offset}px)">
-        <rect x="0" y="${surface}" width="120" height="${252 - surface}" fill="url(#lg-${uid})"/>
-        <rect x="0" y="${surface}" width="120" height="${252 - surface}" fill="url(#dp-${uid})"/>
-        <g clip-path="url(#lc-${uid})">${finish}</g>
-        <g clip-path="url(#lc-${uid})">${bubbles}</g>
-        <ellipse cx="60" cy="${surface}" rx="${rx}" ry="3.8" style="fill:var(--l4)" opacity=".9"/>
-        <ellipse cx="60" cy="${surface - .8}" rx="${rx * .82}" ry="2.3" fill="#fff" opacity=".38"/>
-        <path d="M${60 - rx} ${surface} q ${rx} 4 ${rx * 2} 0" fill="none" style="stroke:var(--l5)" stroke-width=".9" opacity=".7"/>
+    <g class="cup-float">
+      <g clip-path="url(#cup-${uid})">
+        <g class="liquid" style="transform:translateY(${offset.toFixed(1)}px)">
+          <rect x="0" y="${surface.toFixed(1)}" width="120" height="${(CUP_FLOOR + 4 - surface).toFixed(1)}" fill="url(#lg-${uid})"/>
+          <rect x="0" y="${surface.toFixed(1)}" width="120" height="${(CUP_FLOOR + 4 - surface).toFixed(1)}" fill="url(#dp-${uid})"/>
+          <rect x="0" y="${surface.toFixed(1)}" width="120" height="${(CUP_FLOOR + 4 - surface).toFixed(1)}" fill="url(#core-${uid})"/>
+          <g clip-path="url(#liq-${uid})">${bubbles}</g>
+          <ellipse cx="60" cy="${surface.toFixed(1)}" rx="${rx.toFixed(1)}" ry="3.4" style="fill:var(--l4)" opacity=".95"/>
+          <ellipse cx="60" cy="${(surface - .7).toFixed(1)}" rx="${(rx * .8).toFixed(1)}" ry="2" fill="#fff" opacity=".42"/>
+          <path d="M${(60 - rx).toFixed(1)} ${surface.toFixed(1)} q ${rx.toFixed(1)} 3.4 ${(rx * 2).toFixed(1)} 0" fill="none" style="stroke:var(--l5)" stroke-width=".9" opacity=".65"/>
+        </g>
+
+        <g class="cup-ice">${cubes}</g>
+
+        <path d="${CUP_BODY}" fill="url(#glass-${uid})"/>
+        <path d="${CUP_BODY}" fill="url(#in-${uid})"/>
+        <g clip-path="url(#cup-${uid})">
+          <rect x="26.5" y="70" width="5.2" height="132" rx="2.6" fill="url(#hl-${uid})" opacity=".5"/>
+          <rect x="34" y="80" width="1.6" height="108" rx=".8" fill="#fff" opacity=".2"/>
+          <path d="M90.5 78 C94 96 95 108 94.6 124 L93 198" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" opacity=".24"/>
+          <path d="M33.5 216 C43 228 78 228 87.5 216" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".18"/>
+          <rect class="cup-sheen" x="-46" y="46" width="30" height="196" fill="url(#sh-${uid})"/>
+        </g>
+
+        <path d="${CUP_BODY}" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.1"/>
+
+        <ellipse cx="60" cy="${CUP_RIM_Y}" rx="44" ry="8" fill="url(#rim-${uid})"/>
+        <ellipse cx="60" cy="${CUP_RIM_Y}" rx="44" ry="8" fill="none" stroke="rgba(255,255,255,.72)" stroke-width="1.6"/>
+        <ellipse cx="60" cy="${CUP_RIM_Y + .6}" rx="40.5" ry="6.6" fill="none" stroke="#fff" stroke-opacity=".34" stroke-width=".9"/>
+        <path d="M24 44.4 C34 38.4 86 38.4 96 44.4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".5"/>
+
+        <g class="cup-cond" fill="#fff" opacity=".26">
+          <ellipse cx="30" cy="96" rx="1.5" ry="2.2"/>
+          <ellipse cx="34.4" cy="118" rx="1.1" ry="1.7"/>
+          <ellipse cx="88" cy="104" rx="1.3" ry="2"/>
+          <ellipse cx="84.6" cy="132" rx="1" ry="1.5"/>
+        </g>
+
+        <!-- extra flash on high fizz -->
+        ${fizz > 70 ? `<circle class="cup-spark" cx="52" cy="${(surface + 12).toFixed(1)}" r="1.8" fill="#fff" opacity=".7"/>` : ''}
       </g>
-
-      <path d="${BODY}" fill="url(#gl-${uid})"/>
-      <path d="${BODY}" fill="url(#in-${uid})"/>
-      <g clip-path="url(#bc-${uid})">
-        <rect x="29" y="64" width="5.4" height="140" rx="2.7" fill="url(#hl-${uid})" opacity=".62"/>
-        <rect x="36.5" y="72" width="1.8" height="116" rx=".9" fill="#fff" opacity=".22"/>
-        <path d="M91.5 70 C95.5 86 96.5 98 96.5 112 L96.5 202" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".26"/>
-        <path d="M39 48 C45 33 53 26 60 25" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".34"/>
-        <path d="M27 214 C37 225 83 225 93 214" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".2"/>
-        <rect x="30" y="88" width="60" height="1.4" fill="#fff" opacity=".12"/>
-      </g>
-      <path d="${BODY}" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="1.1"/>
-    </g>
-
-    <g class="cap">
-      <rect x="38.5" y="1.5" width="43" height="21" rx="7" fill="url(#cap-${uid})"/>
-      <g stroke="rgba(255,255,255,.10)" stroke-width=".9">${capRidges}</g>
-      <rect x="38.5" y="1.5" width="43" height="21" rx="7" fill="none" stroke="rgba(255,255,255,.18)" stroke-width=".8"/>
-      <rect x="43" y="4.4" width="34" height="3" rx="1.5" fill="rgba(255,255,255,.24)"/>
-      <rect x="42" y="20" width="36" height="2.6" rx="1.3" fill="rgba(0,0,0,.32)"/>
     </g>
   </svg>`;
 }
 
-/* ───────────── charm stage ───────────── */
-
-function charmSVG(def) {
-  return `<svg viewBox="0 0 24 24" aria-hidden="true">${def.art}</svg>`;
-}
-
-function charmHTML(c, i) {
-  const def = charmById(c.id);
-  return def ? `<span class="charm" data-charm-index="${i}" data-charm="${def.id}" style="left:${c.x}%;top:${c.y}%;--rot:${c.rot || 0}deg">${charmSVG(def)}</span>` : '';
-}
-
 function bottleStage(opts) {
-  const o = Object.assign({ finish:'none', charms:[], cls:'', editable:false }, opts);
-  const charms = (o.charms || []).map(charmHTML).join('');
-  return `<div class="bottle-stage ${o.cls} ${o.editable ? 'is-editable' : ''} ${o.still ? 'is-still' : ''}" data-bottle-stage>${bottleSVG(o)}${charms}</div>`;
+  const o = Object.assign({ cls:'', editable:false }, opts);
+  return `<div class="bottle-stage ${o.cls} ${o.still ? 'is-still' : ''}" data-bottle-stage>${bottleSVG(o)}</div>`;
 }
 
-/* Update a live bottle in place: repaint colors and move/add/remove charms.
-   The SVG is only rebuilt when its shape changes (fill, fizz, finish). */
+/* Simple colored cutout for flavor sheets (fallback until real SVGs are added) */
+function cutoutSVG(f) {
+  return `<svg viewBox="0 0 120 120" width="92" height="92">
+    <defs>
+      <radialGradient id="co-${f.id}" cx=".42" cy=".38" r=".72">
+        <stop offset="0" stop-color="#fff" stop-opacity=".65"/>
+        <stop offset=".55" stop-color="${f.color}" stop-opacity=".95"/>
+        <stop offset="1" stop-color="${darken(f.color,.25)}"/>
+      </radialGradient>
+    </defs>
+    <circle cx="60" cy="60" r="52" fill="url(#co-${f.id})"/>
+    <circle cx="60" cy="60" r="52" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="3"/>
+    <circle cx="46" cy="44" r="14" fill="#fff" opacity=".35"/>
+  </svg>`;
+}
+
+/* Update a live bottle in place. The SVG is only rebuilt when its shape
+   changes (fill, fizz, seed); a color change is a cheap repaint. */
 function syncStage(host, opts) {
-  const key = [opts.fill, opts.fizz, opts.seed, opts.finish].join('|');
+  const key = [opts.fill, opts.fizz, opts.seed].join('|');
   const stage = host.firstElementChild;
   if (!stage || stage.dataset.key !== key) {
     host.innerHTML = bottleStage(opts);
@@ -575,15 +518,6 @@ function syncStage(host, opts) {
     return;
   }
   stage.querySelector('.bottle').style.cssText = bottleVars(opts.color);
-  const els = stage.querySelectorAll('.charm');
-  opts.charms.forEach((c, i) => {
-    if (!els[i]) return stage.insertAdjacentHTML('beforeend', charmHTML(c, i));
-    if (els[i].dataset.charm !== c.id) return void (els[i].outerHTML = charmHTML(c, i));
-    els[i].style.left = c.x + '%';
-    els[i].style.top = c.y + '%';
-    els[i].style.setProperty('--rot', `${c.rot || 0}deg`);
-  });
-  for (let i = opts.charms.length; i < els.length; i++) els[i].remove();
 }
 
 /* ───────────── state ───────────── */
@@ -593,7 +527,9 @@ const KEY = 'sodalab.v1';
 // badges.js (loaded first) owns the badge store; this is the only way app.js talks to it.
 const badges = (fn, ...args) => (window.SodaBadges ? window.SodaBadges[fn](...args) : undefined);
 
-const defaultMix = () => ({ base:'soda', flavors:[], sweet:3, fizz:3, temp:'ice', finish:'none', charms:[] });
+const SCHEMA = 2;                 // 2 = sliders, fizz 0–100, no finish/charms/rarity
+const SAVE_LIMIT = 10;            // free accounts; nothing is ever deleted over the limit
+const defaultMix = () => ({ base:'soda', flavors:[], fizz:50, temp:'ice' });
 
 /* ───────────── saved-data validation ─────────────
    Everything read from localStorage goes through sanitizeMix / sanitizeBatch,
@@ -608,36 +544,44 @@ const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
 const intIn = (v, a, b, d) => (Number.isInteger(v) && v >= a && v <= b ? v : d);
 const numIn = (v, a, b, d) => (typeof v === 'number' && Number.isFinite(v) ? clamp(v, a, b) : d);
 
-function sanitizeCharms(list) {
+/* v0.4 fizz was a 0–5 dial; v1 uses 0–100. Only pre-schema-2 data is scaled. */
+const migrateFizz = (v, legacy) => {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return 50;
+  if (legacy && v <= 5) return Math.round(clamp(v, 0, 5) * 20);
+  return Math.round(clamp(v, 0, 100));
+};
+
+/* Flavors are [{ id, value }]. Old saves stored bare ids; those become a full
+   slider so the recipe survives the upgrade. Duplicates and unknown ids drop. */
+function sanitizeFlavors(list, legacy) {
   if (!Array.isArray(list)) return [];
-  return list
-    .filter(c => isObj(c) && charmById(c.id))
-    .slice(0, MAX_CHARMS)
-    .map(c => ({ id: c.id, x: numIn(c.x, 0, 100, 50), y: numIn(c.y, 0, 100, 50), rot: numIn(c.rot, -45, 45, 0) }));
+  const seen = new Set(), out = [];
+  for (const item of list) {
+    const id = typeof item === 'string' ? item : (isObj(item) ? item.id : null);
+    if (typeof id !== 'string' || !flavorById(id) || seen.has(id)) continue;
+    const value = isObj(item) ? Math.round(numIn(item.value, 0, 100, 100)) : 100;
+    if (value <= 0) continue;
+    seen.add(id);
+    out.push({ id, value });
+  }
+  return out;
 }
 
-function sanitizeMix(m) {
+function sanitizeMix(m, legacy = false) {
   const d = defaultMix();
   if (!isObj(m)) return d;
-  const flavors = Array.isArray(m.flavors)
-    ? m.flavors.filter((id, i, a) => typeof id === 'string' && flavorById(id) && a.indexOf(id) === i).slice(0, 3)
-    : [];
   return {
     base:    BASES.some(b => b.id === m.base) ? m.base : d.base,
-    flavors,
-    sweet:   intIn(m.sweet, 0, 5, d.sweet),
-    fizz:    intIn(m.fizz, 0, 5, d.fizz),
+    flavors: sanitizeFlavors(m.flavors, legacy),
+    fizz:    migrateFizz(m.fizz, legacy),
     temp:    TEMPS.some(t => t.id === m.temp) ? m.temp : d.temp,
-    finish:  FINISHES.some(f => f.id === m.finish) ? m.finish : d.finish,
-    charms:  sanitizeCharms(m.charms),
   };
 }
 
-/* Returns a clean batch, or null if the entry is unusable. Missing rarity and
-   rating are filled in (older saves), exactly as before. */
-function sanitizeBatch(b) {
+/* Returns a clean batch, or null if the entry is unusable. */
+function sanitizeBatch(b, legacy = false) {
   if (!isObj(b)) return null;
-  const mix = sanitizeMix(b);
+  const mix = sanitizeMix(b, legacy);
   const id = typeof b.id === 'string' && ID_RE.test(b.id) ? b.id : 'r' + hashStr(JSON.stringify(b)).toString(36);
   const name = typeof b.name === 'string' && b.name.trim() ? b.name.trim().slice(0, 80) : makeName(mix);
   const out = Object.assign({
@@ -648,57 +592,10 @@ function sanitizeBatch(b) {
     color: typeof b.color === 'string' && HEX_RE.test(b.color) ? b.color : blendColor(mix),
     date:  numIn(b.date, 0, 8.64e15, Date.now()),
   });
-  if (b.merged === true) {
-    out.merged = true;
-    out.lineage = Array.isArray(b.lineage) ? b.lineage.filter(x => typeof x === 'string' && ID_RE.test(x)).slice(0, 2) : [];
+  if (typeof b.remixedFrom === 'string' && b.remixedFrom.trim()) {
+    out.remixedFrom = b.remixedFrom.trim().slice(0, 80);
   }
-  out.rarity = RARITY.some(r => r.id === b.rarity) ? b.rarity : rollRarity(out.id, luckOf(out)).id;
-  out.rating = typeof b.rating === 'number' && Number.isFinite(b.rating) ? Math.round(clamp(b.rating, 0, 100)) : scoreOf(out);
   return out;
-}
-
-function luckOf(b) {
-  let l = 0;
-  l += Math.min((b.flavors || []).length, 3) * .07;
-  if (b.finish && b.finish !== 'none') l += finishById(b.finish).luck;
-  l += Math.min((b.charms || []).length, MAX_CHARMS) * .045;
-  if (b.merged) l += .18;
-  if ((b.flavors || []).length === 3) l += .03;
-  return clamp(l, 0, .8);
-}
-
-function rollRarity(seed, luck) {
-  const rnd = mulberry32(hashStr(String(seed)));
-  const weights = RARITY.map((r, i) => r.weight * Math.pow(1 + luck, i * 1.15));
-  const total = weights.reduce((a, b) => a + b, 0);
-  let pick = rnd() * total;
-  for (let i = 0; i < weights.length; i++) {
-    pick -= weights[i];
-    if (pick <= 0) return RARITY[i];
-  }
-  return RARITY[0];
-}
-
-function rarityOdds(id, luck) {
-  const weights = RARITY.map((r, i) => r.weight * Math.pow(1 + luck, i * 1.15));
-  const total = weights.reduce((a, b) => a + b, 0);
-  const i = RARITY.findIndex(r => r.id === id);
-  const p = i >= 0 ? weights[i] / total : 0;
-  if (!p) return '';
-  return `1 in ${Math.max(2, Math.round(1 / p))}`;
-}
-
-function scoreOf(b) {
-  const mix = { base:b.base, flavors:b.flavors || [], sweet:b.sweet, fizz:b.fizz, temp:b.temp };
-  const p = profileOf(mix);
-  const vals = [p.sweet, p.tart, p.bitter, p.spice, p.herbal];
-  const mean = vals.reduce((a, v) => a + v, 0) / vals.length;
-  const spread = vals.reduce((a, v) => a + Math.abs(v - mean), 0) / vals.length;
-  const harmony = clamp(1 - spread * 1.25, 0, 1);
-  const complexity = clamp((b.flavors || []).length / 3, 0, 1);
-  const rare = rarityById(b.rarity);
-  const bonus = (rare.stars - 1) * 3.2 + (b.finish && b.finish !== 'none' ? 3 : 0) + Math.min((b.charms || []).length, MAX_CHARMS) * 1.5;
-  return Math.round(clamp(48 + harmony * 20 + complexity * 12 + bonus, 40, 99));
 }
 
 const state = {
@@ -708,7 +605,7 @@ const state = {
   count: 0,
   lastBatch: null,
   pending: null,
-  charmSel: 'star',
+  showAllFlavors: false,
 };
 
 function load() {
@@ -717,17 +614,18 @@ function load() {
     if (!raw) return;
     const d = JSON.parse(raw);
     if (!isObj(d)) return;
+    const legacy = d.v !== SCHEMA;      // pre-v1 saves: 0–5 fizz, bare flavor ids
     if (Array.isArray(d.saved)) {
       const seen = new Set();
-      state.saved = d.saved.map(sanitizeBatch).filter(b => b && !seen.has(b.id) && seen.add(b.id));
+      state.saved = d.saved.map(b => sanitizeBatch(b, legacy)).filter(b => b && !seen.has(b.id) && seen.add(b.id));
     }
     state.count = Math.max(intIn(d.count, 0, 1e9, 0), 0, ...state.saved.map(b => b.num));
-    if (d.mix) state.mix = sanitizeMix(d.mix);
+    if (d.mix) state.mix = sanitizeMix(d.mix, legacy);
   } catch (e) { /* storage unavailable — carry on */ }
 }
 function persist() {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ saved: state.saved, count: state.count, mix: state.mix }));
+    localStorage.setItem(KEY, JSON.stringify({ v: SCHEMA, saved: state.saved, count: state.count, mix: state.mix }));
   } catch (e) { /* ignore */ }
 }
 
@@ -816,20 +714,17 @@ function back(dir = 'pop') {
 }
 
 function overlayOpen() {
-  const deco = $('#decoLayer');
   if (sheetLayer.classList.contains('is-open')) return 'sheet';
-  if (deco && deco.classList.contains('is-open')) return 'deco';
   if (brewLayer.classList.contains('is-open')) return 'brew';
   return null;
 }
 
 window.addEventListener('popstate', e => {
-  // Back with a sheet or Decorate open closes it and keeps the screen: put the
-  // entry we just left back on the stack. Back during a brew is ignored.
+  // Back with a sheet open closes it and keeps the screen: put the entry we
+  // just left back on the stack. Back during a brew is ignored.
   const overlay = overlayOpen();
   if (overlay) {
     if (overlay === 'sheet') closeSheet();
-    if (overlay === 'deco') cancelDeco();
     history.pushState(navState, '', location.pathname + location.search + '#/' + navState.v);
     return;
   }
@@ -871,8 +766,8 @@ function renderHome() {
 
   const mix = state.mix;
   const color = blendColor(mix);
-  const fs = mix.flavors.map(flavorById).filter(Boolean);
-  const hasFlavors = fs.length > 0;
+  const shares = sharesOf(mix).sort((a, b) => b.share - a.share);
+  const hasFlavors = shares.length > 0;
   const hero = $('#homeHero');
 
   hero.style.background = `
@@ -884,14 +779,14 @@ function renderHome() {
       <div class="hero-kicker">${hasFlavors ? 'In the lab' : 'The lab is open'}</div>
       <div class="hero-title">${hasFlavors ? makeName(mix) : 'Mix something bright.'}</div>
       <div class="hero-sub">${hasFlavors
-        ? `${baseById(mix.base).name} · ${fs.map(f => f.name).join(', ')}`
+        ? `${baseById(mix.base).name} · ${shares.map(s => s.f.name).join(', ')}`
         : `Four bases, ${FLAVORS.length} flavors, one very good glass.`}</div>
       <button class="hero-btn">
         ${hasFlavors ? 'Continue' : 'Start a batch'}
         <svg viewBox="0 0 24 24" width="15" height="15"><path d="M5 12h13m-5-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     </div>
-    <div class="hero-art">${bottleStage({ color, fill:.8, fizz:mix.fizz, seed:7, finish:mix.finish, charms:mix.charms })}</div>`;
+    <div class="hero-art">${bottleStage({ color, fill:.8, fizz:mix.fizz, seed:7 })}</div>`;
 
   hero.onclick = () => go('mix', 'push');
   renderHomeBadges();
@@ -906,10 +801,10 @@ function renderHome() {
     row.innerHTML = state.saved.slice(0, 6).map(b => `
       <button class="mini-card" data-batch="${esc(b.id)}">
         <div class="mini-art" style="background:linear-gradient(160deg, ${lighten(b.color,.86)}, ${lighten(b.color,.94)})">
-          ${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 999, finish:b.finish, charms:b.charms, still:true })}
+          ${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 999, still:true })}
         </div>
         <div class="mini-name">${esc(b.name)}</div>
-        <div class="mini-meta">${dateLabel(b.date)} · ${rarityById(b.rarity).name}</div>
+        <div class="mini-meta">${dateLabel(b.date)} · ${b.flavors.length} flavor${b.flavors.length === 1 ? '' : 's'}</div>
       </button>`).join('');
   }
 
@@ -944,15 +839,16 @@ function dateLabel(ts) {
 
 /* Everything the mixer shows that is derived from the mix itself. */
 function deriveMix(mix) {
-  const fs = mix.flavors.map(flavorById).filter(Boolean);
+  const shares = sharesOf(mix).sort((a, b) => b.share - a.share);
   return {
     color: blendColor(mix),
     name:  makeName(mix),
-    sub:   fs.length
-      ? `${baseById(mix.base).name} · ${fs.map(f => f.name).join(', ')}`
+    sub:   shares.length
+      ? `${baseById(mix.base).name} · ${shares.map(s => s.f.name).join(', ')}`
       : `${baseById(mix.base).name} · no flavors yet`,
-    flavors: fs,
-    fill:  fs.length ? .82 : .62,
+    flavors: shares.map(s => s.f),
+    shares,
+    fill:  shares.length ? .82 : .62,
   };
 }
 
@@ -960,16 +856,12 @@ function renderMix() {
   const mix = state.mix;
   const derived = deriveMix(mix);
   const color = derived.color;
-  const fs = derived.flavors;
 
   $('#mixWash').style.background = `
     radial-gradient(52% 48% at 50% 40%, ${rgba(color, .34)} 0%, ${rgba(color, .10)} 52%, transparent 74%),
     radial-gradient(40% 42% at 24% 62%, ${rgba(lighten(color,.3), .30)} 0%, transparent 70%)`;
 
-  syncStage($('#mixBottle'), {
-    color, fill: derived.fill, fizz: mix.fizz, seed: 21,
-    finish: mix.finish, charms: mix.charms,
-  });
+  syncStage($('#mixBottle'), { color, fill: derived.fill, fizz: mix.fizz, seed: 21 });
 
   $('#mixName').textContent = derived.name;
   $('#mixSub').textContent = derived.sub;
@@ -983,28 +875,43 @@ function renderMix() {
     </button>`).join('');
   baseRow.querySelectorAll('[data-base]').forEach(el => el.setAttribute('aria-pressed', mix.base === el.dataset.base));
 
-  // flavor chips: fixed slots, refilled in place
-  const visible = visibleFlavors();
-  const chipHost = $('#flavorChips');
-  if (chipHost.children.length !== visible.length + 1) chipHost.innerHTML = visible.map(() => `
-    <button class="chip"><span class="sw"></span><span class="nm"></span></button>`).join('') + `<button class="chip chip--wide" data-all-flavors>
-      <span class="nm">All ${FLAVORS.length} flavors</span>
-    </button>`;
-  visible.forEach((f, i) => {
-    const el = chipHost.children[i];
-    const on = mix.flavors.includes(f.id);
-    el.dataset.flavorToggle = f.id;
-    el.setAttribute('aria-pressed', on);
-    el.classList.toggle('is-locked', !on && mix.flavors.length >= 3);
-    el.firstElementChild.style.background = f.color;
-    el.lastElementChild.textContent = f.name;
-  });
+  // flavor slider rows, sorted by share (biggest pour first)
+  const shares = sharesOf(mix).sort((a, b) => b.share - a.share);
+  const host = $('#flavorSliders');
+  const key = shares.map(s => s.id + ':' + s.value).join(',') + '|' + (state.showAllFlavors ? 1 : 0);
+  if (host.dataset.key !== key) {
+    host.dataset.key = key;
+    const shown = state.showAllFlavors ? shares : shares.slice(0, MIXER_ROWS);
+    host.innerHTML = shown.map(s => sliderRow(s, color)).join('');
+    const hidden = shares.length - shown.length;
+    $('#showAllFlavors').hidden = hidden <= 0 && !state.showAllFlavors;
+    $('#showAllFlavors').textContent = state.showAllFlavors ? 'Show fewer' : `Show all ${shares.length}`;
+  } else {
+    host.querySelectorAll('[data-flavor-range]').forEach(input => {
+      const s = shares.find(x => x.id === input.dataset.flavorRange);
+      if (s) input.value = s.value;
+    });
+    host.querySelectorAll('[data-flavor-pct]').forEach(el => {
+      const s = shares.find(x => x.id === el.dataset.flavorPct);
+      if (s) el.textContent = pctText(s.share);
+    });
+  }
 
-  $('#flavorCount').textContent = `${mix.flavors.length} / 3`;
+  $('#flavorCount').textContent = shares.length
+    ? `${shares.length} flavor${shares.length === 1 ? '' : 's'}`
+    : 'None yet';
+  $('#flavorEmpty').hidden = shares.length > 0;
 
-  // dials
-  syncDial('sweet');
-  syncDial('fizz');
+  // shares meter + scale-to-fit note
+  const meter = $('#mixShares');
+  meter.hidden = !shares.length;
+  meter.innerHTML = shares.map(s => `<i style="flex:${Math.max(s.share, .01)};background:${s.f.color}"></i>`).join('');
+  const scaleNote = $('#scaleNote');
+  scaleNote.hidden = !scaledToFit(mix);
+  if (!scaleNote.hidden) scaleNote.textContent = `Scaled to fit · ${Math.round(rawDoseTotal(mix))} ml of flavor in a ${CUP_ROOM} ml cup`;
+
+  // fizz
+  syncFizz();
 
   // serve
   const tempRow = $('#tempRow');
@@ -1012,32 +919,16 @@ function renderMix() {
     <button class="temp-opt" data-temp="${t.id}">${t.label}</button>`).join('');
   tempRow.querySelectorAll('[data-temp]').forEach(el => el.setAttribute('aria-pressed', mix.temp === el.dataset.temp));
 
-  // style
-  const fin = finishById(mix.finish);
-  const sw = $('#styleSwatch');
-  if (sw) {
-    sw.style.background = fin.id === 'none'
-      ? 'radial-gradient(circle at 32% 26%, #fff, #DCE6EA 70%)'
-      : `linear-gradient(140deg, ${fin.swatch}, ${lighten(fin.swatch, .45)})`;
-    $('#styleName').textContent = fin.id === 'none' ? 'Clear glass' : `${fin.name} finish`;
-    $('#styleSub').textContent = mix.charms.length
-      ? `${mix.charms.length} charm${mix.charms.length === 1 ? '' : 's'} · ${fin.sub.toLowerCase()}`
-      : fin.id === 'none' ? 'Add a finish, glitter or charms' : fin.sub;
-    $('#charmCount').textContent = mix.charms.length
-      ? `${mix.charms.length} charm${mix.charms.length === 1 ? '' : 's'}`
-      : 'Optional';
-  }
-
   // hint
-  $('#mixHint').textContent = fs.length === 0
-    ? 'Pick a base and up to three flavors. The lab handles the rest.'
-    : fs.length >= 3
-      ? 'Three flavors is the sweet spot. A finish and charms tilt the rarity odds.'
-      : `Tasting ${fs.map(f => f.name.toLowerCase()).join(', ')}. Add ${3 - fs.length} more, or dress it up for better odds.`;
+  $('#mixHint').textContent = !shares.length
+    ? 'Add a flavor to start. Every slider is its own strength.'
+    : shares.length === 1
+      ? `${shares[0].f.name} at ${Math.round(shares[0].share * 100)}%. Add another flavor to blend, or brew it as is.`
+      : `${shares[0].f.name} leads with ${Math.round(shares[0].share * 100)}%. Doses scale to fit; shares always total 100%.`;
 
   // cta
   const btn = $('#brewBtn');
-  const useColor = fs.length > 0;
+  const useColor = shares.length > 0;
   btn.style.background = useColor ? color : '#111';
   btn.style.color = useColor ? readableOn(color) : '#fff';
   btn.style.boxShadow = useColor
@@ -1045,38 +936,54 @@ function renderMix() {
     : '';
 }
 
-function visibleFlavors() {
-  const chosen = state.mix.flavors.map(flavorById).filter(Boolean);
-  const rest = CURATED.map(flavorById).filter(f => f && !state.mix.flavors.includes(f.id));
-  const list = [...chosen, ...rest];
-  const seen = new Set();
-  return list.filter(f => (seen.has(f.id) ? false : (seen.add(f.id), true))).slice(0, 6);
+const MIXER_ROWS = 6;
+const pctText = share => share > 0 && share < .01 ? '<1%' : `${Math.round(share * 100)}%`;
+
+function sliderRow(s, color) {
+  return `<div class="fl-row" data-flavor-row="${s.id}">
+    <div class="fl-top">
+      <span class="fl-dot" style="background:${s.f.color}"></span>
+      <span class="fl-name">${s.f.name}</span>
+      <span class="fl-pct" data-flavor-pct="${s.id}">${pctText(s.share)}</span>
+      <button class="fl-x" data-flavor-remove="${s.id}" aria-label="Remove ${s.f.name}">
+        <svg viewBox="0 0 24 24" width="13" height="13"><path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <input type="range" min="0" max="100" step="1" value="${s.value}" data-flavor-range="${s.id}" aria-label="${s.f.name} strength" style="--fill:${s.f.color}">
+  </div>`;
 }
 
-function syncDial(kind) {
-  const mix = state.mix;
-  const v = mix[kind];
-  const input = $(`#${kind}Range`);
-  const label = $(`#${kind}Val`);
-  const color = blendColor(mix);
+function syncFizz() {
+  const v = state.mix.fizz;
+  const input = $('#fizzRange');
+  const color = blendColor(state.mix);
   input.value = v;
-  input.style.setProperty('--pct', `${v / 5 * 100}%`);
+  input.style.setProperty('--pct', `${v}%`);
   input.style.setProperty('--fill', color);
-  label.textContent = kind === 'sweet' ? SWEET_WORDS[v] : FIZZ_WORDS[v];
-  label.style.color = v > 0 ? darken(color, .15) : 'var(--ink-3)';
+  $('#fizzVal').textContent = fizzLabel(v);
+  $('#fizzVal').style.color = v > 0 ? darken(color, .15) : 'var(--ink-3)';
 }
 
-/* Returns 'added' | 'removed' | 'full' (nothing changed; the toast says why). */
+/* Add (100) or remove a flavor. No count limit: duplicates are ignored and
+   only unknown ids drop. */
 function toggleFlavor(id) {
   const mix = state.mix;
-  const i = mix.flavors.indexOf(id);
+  const i = mix.flavors.findIndex(x => x.id === id);
   let result;
   if (i >= 0) { mix.flavors.splice(i, 1); result = 'removed'; }
-  else if (mix.flavors.length < 3) { mix.flavors.push(id); result = 'added'; }
-  else { toast('Three flavors max'); return 'full'; }
+  else { mix.flavors.push({ id, value: 100 }); result = 'added'; }
   persist();
   renderMix();
   return result;
+}
+
+function setFlavorValue(id, value) {
+  const item = state.mix.flavors.find(x => x.id === id);
+  if (!item) return;
+  item.value = Math.round(clamp(value, 0, 100));
+  if (item.value === 0) state.mix.flavors = state.mix.flavors.filter(x => x.id !== id);
+  persist();
+  renderMix();
 }
 
 /* ───────────── brewing ───────────── */
@@ -1093,17 +1000,12 @@ function makeBatch(mix) {
     num: state.count,
     name: makeName(mix),
     base: mix.base,
-    flavors: [...mix.flavors],
-    sweet: mix.sweet,
+    flavors: mix.flavors.map(f => ({ ...f })),
     fizz: mix.fizz,
     temp: mix.temp,
-    finish: mix.finish || 'none',
-    charms: (mix.charms || []).map(c => ({ ...c })),
     color,
     date: Date.now(),
   };
-  batch.rarity = rollRarity(batch.id, luckOf(batch)).id;
-  batch.rating = scoreOf(batch);
   return batch;
 }
 
@@ -1116,7 +1018,6 @@ function runBrew(batch, steps) {
     rgba(10,10,12,.87)`;
   brewBottle.innerHTML = bottleStage({
     color: batch.color, fill: .84, fizz: batch.fizz, seed: 5, animate: true,
-    finish: batch.finish, charms: batch.charms,
   });
   brewStep.textContent = steps[0];
   brewStep.style.opacity = 1;
@@ -1168,7 +1069,7 @@ function finishBrew() {
   if (!batch) return;
   state.lastBatch = batch;
   state.pending = null;
-  badges('evaluateBadges', batch.merged ? 'merge' : 'brew', { batch });   // once per brew, never in renderResult
+  badges('evaluateBadges', 'brew', { batch });   // once per brew, never in renderResult
   renderResult(batch, true);
   go('result', 'push');
   persist();
@@ -1177,10 +1078,11 @@ function finishBrew() {
 /* ───────────── result ───────────── */
 
 function renderResult(batch, fresh) {
-  const mix = { base: batch.base, flavors: batch.flavors, sweet: batch.sweet, fizz: batch.fizz, temp: batch.temp };
+  const mix = { base: batch.base, flavors: batch.flavors, fizz: batch.fizz, temp: batch.temp };
   const p = profileOf(mix);
   const color = batch.color;
   const isSaved = state.saved.some(b => b.id === batch.id);
+  const shares = sharesOf(mix).sort((a, b) => b.share - a.share);
 
   const bars = [
     ['Sweet', p.sweet], ['Tart', p.tart], ['Bitter', p.bitter], ['Spice', p.spice], ['Herbal', p.herbal],
@@ -1192,16 +1094,18 @@ function renderResult(batch, fresh) {
     </div>`).join('');
 
   const stats = [
-    ['Sweetness', `${batch.sweet}/5`],
-    ['Fizz', `${batch.fizz}/5`],
+    ['Fizz', fizzLabel(batch.fizz)],
     ['Serve', (TEMPS.find(t => t.id === batch.temp) || TEMPS[0]).label],
+    ['Flavors', String(shares.length)],
   ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
 
-  const rarity = rarityById(batch.rarity);
-  const fin = finishById(batch.finish);
-  const charmTags = (batch.charms || []).map(c => charmById(c.id)).filter(Boolean)
-    .map(c => `<span class="tag tag--charm">${charmSVG(c)}${c.name}</span>`).join('');
-  const dressed = fin.id !== 'none' || (batch.charms || []).length > 0 || batch.merged;
+  const recipe = shares.map(s => `
+    <div class="recipe-row">
+      <span class="rr-dot" style="background:${s.f.color}"></span>
+      <span class="rr-name">${s.f.name}</span>
+      <span class="rr-bar"><i style="width:${Math.round(s.share * 100)}%;background:${s.f.color}"></i></span>
+      <span class="rr-num">${pctText(s.share)}</span>
+    </div>`).join('');
 
   $('#resultBody').innerHTML = `
     <div class="result-top">
@@ -1217,28 +1121,19 @@ function renderResult(batch, fresh) {
     <div class="result-hero">
       <div class="result-wash" style="background:
         radial-gradient(46% 42% at 50% 42%, ${rgba(color,.30)} 0%, ${rgba(color,.08)} 55%, transparent 76%)"></div>
-      <div class="result-bottle">${bottleStage({ color, fill:.84, fizz:batch.fizz, seed:11, finish:batch.finish, charms:batch.charms })}</div>
+      <div class="result-bottle">${bottleStage({ color, fill:.84, fizz:batch.fizz, seed:11 })}</div>
       <div class="result-eyebrow">${fresh ? 'Freshly brewed' : 'From your shelf'}</div>
       <h1 class="result-name">${esc(batch.name)}</h1>
-      <div class="result-sub">${baseById(batch.base).name} · ${batch.flavors.length ? batch.flavors.map(fname).join(', ') : 'No flavors'}</div>
-      <div class="rarity-badge" style="--rc:${rarity.color}" title="Rolled at brew time">
-        <span class="rarity-stars">${'★'.repeat(rarity.stars)}<span class="rarity-dim">${'★'.repeat(6 - rarity.stars)}</span></span>
-        <span class="rarity-name">${rarity.name}</span>
-        <span class="rarity-score">${batch.rating}<small>/100</small></span>
-      </div>
-      <div class="rarity-note">Rolled at brew time · ${rarityOdds(batch.rarity, luckOf(batch))}</div>
+      <div class="result-sub">${baseById(batch.base).name} · ${shares.length ? shares.map(s => s.f.name).join(', ') : 'No flavors'}</div>
+      ${batch.remixedFrom ? `<div class="remix-credit">Remixed from ${esc(batch.remixedFrom)}</div>` : ''}
     </div>
 
     <div class="stat-row">${stats}</div>
 
-    ${dressed ? `<div class="panel">
-      <div class="panel-title">Dressing</div>
-      <div class="tag-row">
-        ${fin.id !== 'none' ? `<span class="tag"><i class="tag-dot" style="background:${fin.swatch}"></i>${fin.name}</span>` : ''}
-        ${charmTags}
-        ${batch.merged ? '<span class="tag tag--merge">Merged batch</span>' : ''}
-      </div>
-    </div>` : ''}
+    <div class="panel">
+      <div class="panel-title">Recipe${scaledToFit(mix) ? ' · scaled to fit' : ''}</div>
+      <div class="recipe-list">${recipe || '<p class="notes-copy">No flavors — just the base.</p>'}</div>
+    </div>
 
     <div class="panel">
       <div class="panel-title">Tasting notes</div>
@@ -1263,6 +1158,10 @@ function renderResult(batch, fresh) {
 
   $('#saveBtn')?.addEventListener('click', () => {
     if (state.saved.some(b => b.id === batch.id)) return;
+    if (state.saved.length >= SAVE_LIMIT) {
+      toast(`You've saved ${SAVE_LIMIT} of ${SAVE_LIMIT}. Remove one to save this.`);
+      return;
+    }
     state.saved.unshift(batch);
     persist();
     badges('evaluateBadges', 'save', { batch });
@@ -1284,9 +1183,7 @@ function renderResult(batch, fresh) {
   });
 
   $('#shareBtn')?.addEventListener('click', () => {
-    const fin = finishById(batch.finish);
-    const rarity = rarityById(batch.rarity);
-    const txt = `${batch.name} — Soda Lab\n${baseById(batch.base).name}, ${batch.flavors.map(fname).join(', ')}\n${rarity.name} · ${batch.rating}/100 · Sweetness ${batch.sweet}/5 · Fizz ${batch.fizz}/5 · ${(TEMPS.find(t => t.id === batch.temp) || TEMPS[0]).label}${fin.id !== 'none' ? ` · ${fin.name} finish` : ''}`;
+    const txt = `${batch.name} — Soda Lab\n${baseById(batch.base).name}, ${shares.map(s => `${s.f.name} ${pctText(s.share)}`).join(', ')}\nFizz ${fizzLabel(batch.fizz)} · ${(TEMPS.find(t => t.id === batch.temp) || TEMPS[0]).label}`;
     shareText(txt, batch.name).then(result => {
       if (result === 'copied') toast('Recipe copied');
       else if (result === 'failed') toast('Could not copy');
@@ -1325,11 +1222,11 @@ function renderShelf() {
   const grid = $('#shelfGrid');
   const empty = $('#shelfEmpty');
   const mergeBtn = $('#mergeBtn');
-  if (mergeBtn) mergeBtn.hidden = state.saved.length < 2;
+  if (mergeBtn) mergeBtn.hidden = true;      // Merge is gone in v1; Remix lives on each bottle
   renderShelfBadges();
   const eyebrow = document.querySelector('[data-view="shelf"] .eyebrow');
   if (eyebrow) eyebrow.textContent = state.saved.length
-    ? `Your collection · ${state.saved.length} bottle${state.saved.length === 1 ? '' : 's'}`
+    ? `Your collection · ${state.saved.length} of ${SAVE_LIMIT}`
     : 'Your collection';
 
   if (!state.saved.length) {
@@ -1341,15 +1238,14 @@ function renderShelf() {
   grid.hidden = false;
   empty.hidden = true;
   grid.innerHTML = state.saved.map(b => {
-    const r = rarityById(b.rarity);
+    const shares = sharesOf(b).sort((a, x) => x.share - a.share);
     return `
     <button class="batch-card" data-batch="${esc(b.id)}">
       <div class="batch-art" style="background:linear-gradient(155deg, ${lighten(b.color,.84)} 0%, ${lighten(b.color,.93)} 100%)">
-        ${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 997, finish:b.finish, charms:b.charms, still:true })}
-        <span class="rarity-chip" style="--rc:${r.color}">${r.name}</span>
+        ${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 997, still:true })}
       </div>
       <div class="batch-name">${esc(b.name)}</div>
-      <div class="batch-meta">${dateLabel(b.date)} · ${b.rating}/100</div>
+      <div class="batch-meta">${dateLabel(b.date)} · ${shares.length} flavor${shares.length === 1 ? '' : 's'}</div>
     </button>`;
   }).join('');
 }
@@ -1424,10 +1320,10 @@ sheetLayer.addEventListener('click', e => {
 function openFlavorSheet(id) {
   const f = flavorById(id);
   if (!f) return;
-  const inMix = state.mix.flavors.includes(id);
+  const inMix = state.mix.flavors.some(x => x.id === id);
   openSheet(`
     <div class="sheet-hero" style="background:linear-gradient(150deg, ${lighten(f.color,.72)}, ${lighten(f.color,.88)})">
-      <div style="width:44px">${bottleSVG({ color:f.color, fill:.8, fizz:3, seed:hashStr(f.id) % 500 })}</div>
+      <div class="cutout-hero" style="--fc:${f.color}">${cutoutSVG(f)}</div>
     </div>
     <h2 class="sheet-title">${f.name}</h2>
     <div class="sheet-note">${f.note}</div>
@@ -1442,203 +1338,90 @@ function openFlavorSheet(id) {
 function openBatchSheet(id) {
   const b = state.saved.find(x => x.id === id);
   if (!b) return;
-  const r = rarityById(b.rarity);
-  const fin = finishById(b.finish);
+  const shares = sharesOf(b).sort((a, x) => x.share - a.share);
   const rows = [
-    ['Rarity', `${r.name} · ${b.rating}/100`],
     ['Base', baseById(b.base).name],
-    ['Flavors', b.flavors.length ? b.flavors.map(fname).join(', ') : 'None'],
-    ['Sweetness', SWEET_WORDS[b.sweet]],
-    ['Carbonation', FIZZ_WORDS[b.fizz]],
+    ['Flavors', shares.length ? shares.map(s => `${s.f.name} ${pctText(s.share)}`).join(', ') : 'None'],
+    ['Fizz', fizzLabel(b.fizz)],
     ['Serve', (TEMPS.find(t => t.id === b.temp) || TEMPS[0]).label],
-    ['Finish', fin.name],
-    ['Charms', b.charms.length ? b.charms.map(c => (charmById(c.id) || {}).name).filter(Boolean).join(', ') : 'None'],
     ['Brewed', dateLabel(b.date)],
   ].map(([k, v]) => `<div class="sheet-li"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
 
   openSheet(`
     <div class="sheet-hero" style="background:linear-gradient(155deg, ${lighten(b.color,.8)}, ${lighten(b.color,.92)})">
-      <div style="width:48px">${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 997, finish:b.finish, charms:b.charms })}</div>
-      <span class="sheet-rarity" style="--rc:${r.color}">${'★'.repeat(r.stars)} ${r.name}</span>
+      <div style="width:48px">${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 997 })}</div>
     </div>
     <h2 class="sheet-title">${esc(b.name)}</h2>
-    <div class="sheet-note">Batch ${String(b.num).padStart(3,'0')} · ${b.rating}/100</div>
+    <div class="sheet-note">Batch ${String(b.num).padStart(3,'0')}${b.remixedFrom ? ` · remixed from ${esc(b.remixedFrom)}` : ''}</div>
     <div class="sheet-list">${rows}</div>
     <div class="sheet-actions">
-      <button class="btn-primary" data-remix="${esc(b.id)}">Mix this again</button>
-      <button class="btn-ghost" data-merge-this="${esc(b.id)}">Merge with another</button>
-      <button class="danger-btn" data-remove-batch="${esc(b.id)}">Remove from shelf</button>
+      <button class="btn-primary" data-remix="${esc(b.id)}">Remix this soda</button>
+      <button class="btn-ghost" data-remove-batch="${esc(b.id)}">Remove from shelf</button>
     </div>`);
 }
 
-/* ───────────── merge ───────────── */
+/* ───────────── remix ─────────────
+   Remix copies the recipe exactly (flavors, values, fizz) and records who it
+   came from. The original stays on the shelf; nothing is consumed. */
 
-let mergePick = [];
-const MERGE_STRIP = /\s+(Fizz|Spritz|Spark|Haze|Bloom|Noir|Crush|Drift|Glow|Mist|Splash|Tonic)$/i;
-
-function mergeShort(n) {
-  return n.replace(MERGE_STRIP, '').split(' ').slice(0, 2).join(' ');
-}
-function mergeName(a, b) {
-  const x = mergeShort(a.name), y = mergeShort(b.name);
-  return x === y ? `${x} Double` : `${x} × ${y}`;
-}
-function mergeFinish(a, b) {
-  const fa = finishById(a.finish), fb = finishById(b.finish);
-  if (fa.id === fb.id) return fa.id;
-  if (fa.id === 'none') return fb.id;
-  if (fb.id === 'none') return fa.id;
-  return hashStr(a.id + b.id) % 2 ? fa.id : fb.id;
-}
-function mergeCharms(a, b) {
-  const out = [], seen = new Set();
-  [...(a.charms || []), ...(b.charms || [])].forEach(c => {
-    if (out.length >= MAX_CHARMS || seen.has(c.id) || !charmById(c.id)) return;
-    seen.add(c.id);
-    out.push({ ...c });
-  });
-  return out;
-}
-function mergeMixOf(a, b) {
-  const flavors = [];
-  [...a.flavors, ...b.flavors].forEach(id => {
-    if (flavorById(id) && !flavors.includes(id) && flavors.length < 3) flavors.push(id);
-  });
-  const base = a.base === b.base ? a.base : (hashStr(a.id + b.id) % 2 ? a.base : b.base);
-  return {
-    base,
-    flavors,
-    sweet: Math.round((a.sweet + b.sweet) / 2),
-    fizz: Math.round((a.fizz + b.fizz) / 2),
-    temp: a.temp,
-    finish: mergeFinish(a, b),
-    charms: mergeCharms(a, b),
-  };
-}
-function makeMergedBatch(a, b) {
-  const mix = mergeMixOf(a, b);
+function remixBatch(src) {
+  if (!src) return null;
+  const mix = { base: src.base, flavors: src.flavors.map(f => ({ ...f })), fizz: src.fizz, temp: src.temp };
   state.count += 1;
   const batch = {
-    id: 'm' + Date.now().toString(36) + Math.floor(Math.random() * 999).toString(36),
+    id: 'r' + Date.now().toString(36) + Math.floor(Math.random() * 999).toString(36),
     num: state.count,
-    name: mergeName(a, b),
+    name: makeName(mix),
     base: mix.base,
-    flavors: [...mix.flavors],
-    sweet: mix.sweet,
+    flavors: mix.flavors,
     fizz: mix.fizz,
     temp: mix.temp,
-    finish: mix.finish,
-    charms: mix.charms.map(c => ({ ...c })),
     color: blendColor(mix),
     date: Date.now(),
-    merged: true,
-    lineage: [a.id, b.id],
+    remixedFrom: src.creator || src.name,
   };
-  batch.rarity = rollRarity(batch.id, luckOf(batch)).id;
-  batch.rating = scoreOf(batch);
   return batch;
 }
-function mergeCandidates() {
-  return mergePick.map(id => state.saved.find(b => b.id === id)).filter(Boolean);
-}
 
-function mergeRow(b, on) {
-  const r = rarityById(b.rarity);
-  return `<button class="merge-row ${on ? 'is-on' : ''}" data-merge-pick="${esc(b.id)}">
-    <span class="merge-art" style="background:linear-gradient(155deg, ${lighten(b.color,.86)}, ${lighten(b.color,.94)})">
-      ${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 997, finish:b.finish, still:true })}
-    </span>
-    <span class="merge-copy">
-      <span class="mr-name">${esc(b.name)}</span>
-      <span class="mr-meta"><i class="rc-dot" style="background:${r.color}"></i>${r.name} · ${b.rating}/100</span>
-    </span>
-    <span class="merge-check">${on ? '✓' : ''}</span>
-  </button>`;
-}
-
-function mergePreviewMarkup(a, b) {
-  const mix = mergeMixOf(a, b);
-  const color = blendColor(mix);
-  const fin = finishById(mix.finish);
-  return `<div class="merge-preview">
-    <div class="merge-preview-art" style="background:linear-gradient(155deg, ${lighten(color,.86)}, ${lighten(color,.94)})">
-      ${bottleStage({ color, fill:.82, fizz:mix.fizz, seed:77, finish:mix.finish, charms:mix.charms })}
-    </div>
-    <div class="merge-preview-copy">
-      <div class="mp-kicker">The blend</div>
-      <div class="mp-name">${esc(mergeName(a, b))}</div>
-      <div class="mp-sub">${mix.flavors.length ? mix.flavors.map(fname).join(' · ') : 'No flavors'} · ${fin.name}</div>
-      <div class="mp-bonus">Merged batches roll with better rarity odds.</div>
-    </div>
-  </div>`;
-}
-
-function openMergeSheet(firstId) {
-  mergePick = firstId ? [firstId] : [];
-  openSheet(`
-    <h2 class="sheet-title" style="font-size:23px">Merge two sodas</h2>
-    <div class="sheet-note">Fuse two batches into one. The originals stay on your shelf.</div>
-    <div class="merge-list" id="mergeList">
-      ${state.saved.map(b => mergeRow(b, mergePick.includes(b.id))).join('')}
-    </div>
-    <div id="mergePreview">${mergePick.length === 2 ? mergePreviewMarkup(...mergeCandidates()) : ''}</div>
-    <div class="sheet-actions">
-      <button class="btn-primary" id="doMergeBtn" ${mergePick.length === 2 ? '' : 'disabled style="opacity:.4;box-shadow:none"'}>
-        ${mergePick.length === 2 ? 'Merge into one' : `Pick ${2 - mergePick.length} more`}
-      </button>
-      <button class="btn-ghost" data-close-sheet>Cancel</button>
-    </div>`);
-}
-
-function refreshMergeSheet() {
-  $$('#mergeList .merge-row').forEach(row => {
-    const on = mergePick.includes(row.dataset.mergePick);
-    row.classList.toggle('is-on', on);
-    const check = row.querySelector('.merge-check');
-    if (check) check.textContent = on ? '✓' : '';
-  });
-  const picks = mergeCandidates();
-  const ready = picks.length === 2;
-  const host = $('#mergePreview');
-  if (host) host.innerHTML = ready ? mergePreviewMarkup(picks[0], picks[1]) : '';
-  const btn = $('#doMergeBtn');
-  if (btn) {
-    btn.disabled = !ready;
-    btn.textContent = ready ? 'Merge into one' : `Pick ${2 - picks.length} more`;
-    btn.style.opacity = ready ? '' : '.4';
-    btn.style.boxShadow = ready ? '' : 'none';
-  }
-}
-
-function doMerge() {
-  const picks = mergeCandidates();
-  if (picks.length !== 2) return;
-  const batch = makeMergedBatch(picks[0], picks[1]);
-  closeSheet(() => runBrew(batch, ['Melting the two', 'Fusing the colors', 'Re-carbonating', 'Sealing the blend']));
+/* Opens the mixer on a copy of a shelf soda. */
+function startRemix(id) {
+  const b = state.saved.find(x => x.id === id);
+  if (!b) return;
+  state.mix = { base: b.base, flavors: b.flavors.map(f => ({ ...f })), fizz: b.fizz, temp: b.temp };
+  state.remixOf = b.creator || b.name;
+  persist();
+  renderMix();
+  closeSheet(() => go('mix', 'push'));
 }
 
 function openAllFlavors() {
   openSheet(`
-    <h2 class="sheet-title" style="font-size:22px">All flavors</h2>
-    <div class="sheet-note">Tap to add or remove. Three per batch.</div>
+    <h2 class="sheet-title" style="font-size:22px">All ${FLAVORS.length} flavors</h2>
+    <div class="sheet-note">Tap to add or remove. No limit — the cup scales to fit.</div>
+    <div class="sheet-search">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="11" cy="11" r="6.4" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="sheetFlavorSearch" type="search" placeholder="Search flavors" autocomplete="off" spellcheck="false" aria-label="Search flavors" />
+    </div>
     <div class="flavor-list sheet-scrolllist" id="sheetFlavorList">
-      ${FLAVORS.map(f => {
-        const on = state.mix.flavors.includes(f.id);
-        return `<button class="flavor-row" data-sheet-toggle="${f.id}">
-          <span class="sw" style="background:linear-gradient(150deg, ${lighten(f.color,.25)}, ${darken(f.color,.08)})"></span>
-          <span class="fr-copy"><span class="fr-name">${f.name}</span><span class="fr-note">${f.note}</span></span>
-          <span class="fr-add" style="${on ? 'background:var(--ink);color:#fff' : ''}">${on ? '✓' : '+'}</span>
-        </button>`;
-      }).join('')}
+      ${FLAVORS.map(f => flavorRowHTML(f)).join('')}
     </div>
     <div class="sheet-actions"><button class="btn-ghost" data-close-sheet>Done</button></div>`);
+}
+
+function flavorRowHTML(f) {
+  const on = state.mix.flavors.some(x => x.id === f.id);
+  return `<button class="flavor-row" data-sheet-toggle="${f.id}" data-name="${f.name.toLowerCase()}">
+    <span class="sw" style="background:linear-gradient(150deg, ${lighten(f.color,.25)}, ${darken(f.color,.08)})"></span>
+    <span class="fr-copy"><span class="fr-name">${f.name}</span><span class="fr-note">${f.note}</span></span>
+    <span class="fr-add" style="${on ? 'background:var(--ink);color:#fff' : ''}">${on ? '✓' : '+'}</span>
+  </button>`;
 }
 
 function refreshSheetToggles() {
   const host = $('#sheetFlavorList');
   if (!host) return;
   host.querySelectorAll('[data-sheet-toggle]').forEach(btn => {
-    const on = state.mix.flavors.includes(btn.dataset.sheetToggle);
+    const on = state.mix.flavors.some(x => x.id === btn.dataset.sheetToggle);
     const add = btn.querySelector('.fr-add');
     add.textContent = on ? '✓' : '+';
     add.style.background = on ? 'var(--ink)' : '';
@@ -1646,179 +1429,7 @@ function refreshSheetToggles() {
   });
 }
 
-/* ───────────── decorate ───────────── */
-
-function swatchFor(fin) {
-  return fin.id === 'none'
-    ? 'radial-gradient(circle at 32% 26%, #fff, #DCE6EA 70%)'
-    : `linear-gradient(140deg, ${fin.swatch}, ${lighten(fin.swatch, .45)})`;
-}
-
-let decoSnapshot = null;   // { finish, charms } when Decorate opened; Cancel restores it
-
-function openDeco() {
-  const layer = $('#decoLayer');
-  if (!layer) return;
-  decoSnapshot = { finish: state.mix.finish, charms: state.mix.charms.map(c => ({ ...c })) };
-  renderDeco();
-  layer.hidden = false;
-  void layer.offsetWidth;
-  layer.classList.add('is-open');
-  // the layer is opaque: pause the screens underneath once it covers them
-  afterTransition(layer, 600, () => views.classList.toggle('is-covered', layer.classList.contains('is-open')));
-}
-
-function closeDeco() {
-  const layer = $('#decoLayer');
-  if (!layer) return;
-  layer.classList.remove('is-open');
-  views.classList.remove('is-covered');
-  if (toastEl.classList.contains('has-action')) hideToast();   // its Undo belongs to Decorate
-  decoSnapshot = null;
-  setTimeout(() => { layer.hidden = true; }, 380);
-  persist();
-  renderMix();
-  renderHome();
-}
-
-function cancelDeco() {
-  if (decoSnapshot) {
-    state.mix.finish = decoSnapshot.finish;
-    state.mix.charms = decoSnapshot.charms;
-  }
-  closeDeco();
-}
-
-function renderDeco() {
-  const mix = state.mix;
-  const color = blendColor(mix);
-  const wash = $('#decoWash');
-  if (wash) {
-    wash.style.background = `
-      radial-gradient(52% 46% at 50% 40%, ${rgba(color, .34)} 0%, ${rgba(color, .10)} 54%, transparent 76%),
-      radial-gradient(40% 42% at 24% 64%, ${rgba(lighten(color,.3), .30)} 0%, transparent 70%)`;
-  }
-  syncStage($('#decoBottle'), {
-    color, fill: mix.flavors.length ? .84 : .66, fizz: mix.fizz, seed: 33,
-    finish: mix.finish, charms: mix.charms, editable: true,
-  });
-  const tray = $('#charmTray');
-  if (!tray.firstElementChild) tray.innerHTML = CHARMS.map(c => `
-      <button class="charm-opt" data-charm-sel="${c.id}" aria-label="${c.name}">
-        ${charmSVG(c)}<span>${c.name}</span>
-      </button>`).join('');
-  tray.querySelectorAll('[data-charm-sel]').forEach(el => el.classList.toggle('is-on', state.charmSel === el.dataset.charmSel));
-  const finRow = $('#decoFinishes');
-  if (!finRow.firstElementChild) finRow.innerHTML = FINISHES.map(f => `
-      <button class="finish-opt" data-finish="${f.id}" aria-label="${f.name}">
-        <span class="finish-sw" style="background:${swatchFor(f)}"></span>
-        <span class="finish-nm">${f.name}</span>
-      </button>`).join('');
-  finRow.querySelectorAll('[data-finish]').forEach(el => el.classList.toggle('is-on', mix.finish === el.dataset.finish));
-  const hint = $('#decoHint');
-  if (hint) hint.textContent = mix.charms.length
-    ? 'Tap the bottle to add · drag to move · tap a charm to remove'
-    : 'Pick a charm, then tap anywhere on the bottle';
-  const count = $('#decoCount');
-  if (count) count.textContent = `${mix.charms.length} charm${mix.charms.length === 1 ? '' : 's'}`;
-}
-
-function placeCharm(rect, cx, cy) {
-  const mix = state.mix;
-  if (mix.charms.length >= MAX_CHARMS) { toast(`${MAX_CHARMS} charms max`); return; }
-  const def = charmById(state.charmSel) || CHARMS[0];
-  const x = clamp((cx - rect.left) / rect.width * 100, 6, 94);
-  const y = clamp((cy - rect.top) / rect.height * 100, 6, 94);
-  mix.charms.push({ id: def.id, x: Math.round(x), y: Math.round(y), rot: Math.round(Math.random() * 24 - 12) });
-  persist();
-  renderDeco();
-}
-
-/* Removing charms can be undone from the toast while Decorate is open. */
-function removeCharms(indexes, msg) {
-  const before = state.mix.charms;
-  state.mix.charms = before.filter((c, i) => !indexes.includes(i));
-  persist();
-  renderDeco();
-  toast(msg, { label: 'Undo', run: () => {
-    state.mix.charms = sanitizeCharms(before);
-    persist();
-    renderDeco();
-  } });
-}
-
-function initDeco() {
-  const stage = $('#decoStage');
-  if (!stage) return;
-  const TAP_SLOP = 8;   // px a press may wander and still count as a tap
-  let press = null, raf = 0;
-
-  // where the pressed charm would land, in % of the bottle, from the press origin
-  const landing = p => {
-    const c = state.mix.charms[p.idx];
-    return {
-      x: clamp(c.x + p.dx / p.rect.width * 100, 4, 96),
-      y: clamp(c.y + p.dy / p.rect.height * 100, 4, 96),
-    };
-  };
-  const moveCharm = () => {
-    raf = 0;
-    if (!press || !press.dragging) return;
-    const c = state.mix.charms[press.idx], to = landing(press);
-    press.el.style.translate = `${(to.x - c.x) * press.rect.width / 100}px ${(to.y - c.y) * press.rect.height / 100}px`;
-  };
-
-  stage.addEventListener('pointerdown', e => {
-    const host = e.target.closest('[data-bottle-stage]');
-    if (press || !host) return;
-    const el = e.target.closest('.charm');
-    press = {
-      id: e.pointerId, el, idx: el ? Number(el.dataset.charmIndex) : -1,
-      x0: e.clientX, y0: e.clientY, dx: 0, dy: 0, dragging: false,
-      rect: host.getBoundingClientRect(),   // read once per press, never during the move
-    };
-    if (el) { el.classList.add('is-dragging'); e.preventDefault(); }
-    try { stage.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-  });
-
-  stage.addEventListener('pointermove', e => {
-    if (!press || e.pointerId !== press.id) return;
-    press.dx = e.clientX - press.x0;
-    press.dy = e.clientY - press.y0;
-    if (!press.dragging && Math.hypot(press.dx, press.dy) < TAP_SLOP) return;
-    press.dragging = true;
-    if (press.el && !raf) raf = requestAnimationFrame(moveCharm);
-  });
-
-  const end = e => {
-    if (!press || e.pointerId !== press.id) return;
-    const p = press;
-    press = null;
-    cancelAnimationFrame(raf);
-    raf = 0;
-    const tap = !p.dragging && e.type === 'pointerup';
-    if (!p.el) { if (tap) placeCharm(p.rect, p.x0, p.y0); return; }
-    p.el.classList.remove('is-dragging');
-    if (tap) { removeCharms([p.idx], 'Charm removed'); return; }
-    if (!p.dragging || !state.mix.charms[p.idx]) return;
-    const c = state.mix.charms[p.idx], to = landing(p);
-    c.x = Math.round(to.x);
-    c.y = Math.round(to.y);
-    p.el.style.translate = '';
-    p.el.style.left = c.x + '%';
-    p.el.style.top = c.y + '%';
-    persist();
-  };
-  stage.addEventListener('pointerup', end);
-  stage.addEventListener('pointercancel', end);
-}
-
-/* ───────────── badges (UI over window.SodaBadges) ───────────── */
-
-/* Forge's badges.js owns the data; everything here only reads it. Art lives in
-   icons/badges: <icon>.svg earned, <icon>-locked.svg locked, mystery.svg for
-   any unearned hidden badge. Tier colours come from .tier-<tier> in styles.css. */
-const BADGE_THEMES = { brewing:'Brewing', rarity:'Rarity', variety:'Variety', combos:'Combos', merging:'Merging', daily:'Daily' };
+const BADGE_THEMES = { brewing:'Brewing', variety:'Variety', combos:'Combos', remixing:'Remixing', daily:'Daily' };
 const BADGE_UNITS = { 'lab-regular':'brews', 'base-tour':'bases', 'pantry-explorer':'flavors', 'combo-hunter':'combos' };
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -2194,8 +1805,24 @@ document.addEventListener('click', e => {
   const chip = t.closest('[data-flavor-toggle]');
   if (chip) { toggleFlavor(chip.dataset.flavorToggle); return; }
 
+  const removeFlavor = t.closest('[data-flavor-remove]');
+  if (removeFlavor) {
+    const id = removeFlavor.dataset.flavorRemove;
+    state.mix.flavors = state.mix.flavors.filter(x => x.id !== id);
+    persist();
+    renderMix();
+    toast(`${flavorById(id).name} removed`);
+    return;
+  }
+
   const all = t.closest('[data-all-flavors]');
   if (all) { openAllFlavors(); return; }
+
+  if (t.closest('#showAllFlavors')) {
+    state.showAllFlavors = !state.showAllFlavors;
+    renderMix();
+    return;
+  }
 
   const sheetToggle = t.closest('[data-sheet-toggle]');
   if (sheetToggle) {
@@ -2213,7 +1840,6 @@ document.addEventListener('click', e => {
   if (addFlavor) {
     const id = addFlavor.dataset.addFlavor;
     const result = toggleFlavor(id);
-    if (result === 'full') return;           // 'Three flavors max' already shown; sheet stays open
     if (result === 'removed') { toast('Removed from mix'); addFlavor.textContent = 'Add to mix'; }
     else { toast(`${flavorById(id).name} added to the mix`); closeSheet(() => go('mix', 'push')); }
     return;
@@ -2231,68 +1857,12 @@ document.addEventListener('click', e => {
   const batchEl = t.closest('[data-batch]');
   if (batchEl) { openBatchSheet(batchEl.dataset.batch); return; }
 
-  const decoBtn = t.closest('[data-open-deco]');
-  if (decoBtn) { openDeco(); return; }
-
-  if (t.closest('[data-cancel-deco]')) { cancelDeco(); return; }
-
-  const closeDecoBtn = t.closest('[data-close-deco]');
-  if (closeDecoBtn) { closeDeco(); return; }
-
-  const charmSel = t.closest('[data-charm-sel]');
-  if (charmSel) { state.charmSel = charmSel.dataset.charmSel; renderDeco(); return; }
-
-  const finishBtn = t.closest('[data-finish]');
-  if (finishBtn) { state.mix.finish = finishBtn.dataset.finish; persist(); renderDeco(); return; }
-
-  const clearCharms = t.closest('[data-clear-charms]');
-  if (clearCharms) {
-    if (state.mix.charms.length) removeCharms(state.mix.charms.map((c, i) => i), 'Charms cleared');
-    return;
-  }
-
-  const mergeStart = t.closest('[data-merge-start]');
-  if (mergeStart) { openMergeSheet(); return; }
-
-  const mergeThis = t.closest('[data-merge-this]');
-  if (mergeThis) {
-    const id = mergeThis.dataset.mergeThis;
-    closeSheet(() => openMergeSheet(id));
-    return;
-  }
-
-  const mergePickEl = t.closest('[data-merge-pick]');
-  if (mergePickEl) {
-    const id = mergePickEl.dataset.mergePick;
-    const i = mergePick.indexOf(id);
-    if (i >= 0) mergePick.splice(i, 1);
-    else {
-      if (mergePick.length >= 2) mergePick.shift();
-      mergePick.push(id);
-    }
-    refreshMergeSheet();
-    return;
-  }
-
-  const doMergeBtn = t.closest('#doMergeBtn');
-  if (doMergeBtn) { doMerge(); return; }
-
   const remix = t.closest('[data-remix]');
   if (remix) {
     const b = state.saved.find(x => x.id === remix.dataset.remix);
     if (b) {
-      state.mix = sanitizeMix({
-        base: b.base,
-        flavors: [...b.flavors],
-        sweet: b.sweet,
-        fizz: b.fizz,
-        temp: b.temp,
-        finish: b.finish,
-        charms: (b.charms || []).map(c => ({ ...c })),
-      });
-      persist();
+      startRemix(b.id);
       badges('evaluateBadges', 'remix', { batch: b });
-      closeSheet(() => go('mix', 'push'));
     }
     return;
   }
@@ -2308,16 +1878,37 @@ document.addEventListener('click', e => {
   }
 });
 
-// sliders
-['sweet', 'fizz'].forEach(kind => {
-  const el = $(`#${kind}Range`);
-  // input: recompute and redraw everything derived (name, color, glow, both dials, button)
+// fizz slider: recompute on input, persist when the drag ends
+{
+  const el = $('#fizzRange');
   el.addEventListener('input', () => {
-    state.mix[kind] = Number(el.value);
+    state.mix.fizz = Number(el.value);
     renderMix();
   });
-  // change: fires once when the drag ends (or per key press) — save then
   el.addEventListener('change', persist);
+}
+
+// per-flavor sliders are rebuilt on every render, so listen on the container
+$('#flavorSliders').addEventListener('input', e => {
+  const input = e.target.closest('[data-flavor-range]');
+  if (!input) return;
+  const id = input.dataset.flavorRange;
+  const item = state.mix.flavors.find(x => x.id === id);
+  if (!item) return;
+  item.value = Math.round(clamp(Number(input.value), 0, 100));
+  // cheap live update: recolor, re-share, redraw the bottle, leave the input alone
+  const shares = sharesOf(state.mix).sort((a, b) => b.share - a.share);
+  const pct = $('#flavorSliders').querySelector(`[data-flavor-pct="${id}"]`);
+  if (pct) pct.textContent = pctText(shares.find(s => s.id === id)?.share || 0);
+  $('#mixShares').innerHTML = shares.map(s => `<i style="flex:${Math.max(s.share, .01)};background:${s.f.color}"></i>`).join('');
+  const color = blendColor(state.mix);
+  syncStage($('#mixBottle'), { color, fill: .82, fizz: state.mix.fizz, seed: 21 });
+  $('#mixName').textContent = makeName(state.mix);
+  $('#mixSub').textContent = `${baseById(state.mix.base).name} · ${shares.map(s => s.f.name).join(', ')}`;
+  syncFizz();
+});
+$('#flavorSliders').addEventListener('change', e => {
+  if (e.target.closest('[data-flavor-range]')) persist();
 });
 
 $('#brewBtn').addEventListener('click', startBrew);
@@ -2338,13 +1929,22 @@ $('#flavorSearch').addEventListener('input', e => {
   renderFlavorList();
 });
 
+// the "all flavors" sheet is rebuilt each time it opens, so filter by delegation
+document.addEventListener('input', e => {
+  if (!e.target || e.target.id !== 'sheetFlavorSearch') return;
+  const q = e.target.value.trim().toLowerCase();
+  const host = $('#sheetFlavorList');
+  if (!host) return;
+  host.querySelectorAll('[data-name]').forEach(row => {
+    row.hidden = !!q && !row.dataset.name.includes(q);
+  });
+});
+
 // keyboard niceties
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (state.view === 'badges' && !overlayOpen()) badgesBack();
   if (sheetLayer.classList.contains('is-open')) closeSheet();
-  const deco = $('#decoLayer');
-  if (deco && deco.classList.contains('is-open')) cancelDeco();
 });
 
 /* ───────────── boot ───────────── */
@@ -2352,10 +1952,10 @@ document.addEventListener('keydown', e => {
 function demoSeed() {
   if (state.saved.length) return;
   const examples = [
-    { base:'soda',    flavors:['cherry','cola'],     sweet:4, fizz:4, temp:'ice',     finish:'glitter', charms:[{ id:'star', x:30, y:40, rot:-9 }, { id:'cherry', x:72, y:64, rot:8 }] },
-    { base:'tonic',   flavors:['lime','mint'],       sweet:2, fizz:5, temp:'ice',     finish:'cosmic',  charms:[{ id:'moon', x:70, y:30, rot:12 }] },
-    { base:'cream',   flavors:['peach'],             sweet:3, fizz:3, temp:'chilled', finish:'pearl',   charms:[{ id:'flower', x:32, y:72, rot:-6 }] },
-    { base:'mineral', flavors:['cucumber','rose'],   sweet:1, fizz:4, temp:'ice',     finish:'aurora',  charms:[{ id:'shell', x:66, y:76, rot:10 }] },
+    { base:'soda',    flavors:[{ id:'cherry', value:80 }, { id:'cola', value:60 }], fizz:62, temp:'ice' },
+    { base:'tonic',   flavors:[{ id:'lime', value:70 }, { id:'mint', value:45 }],   fizz:88, temp:'ice' },
+    { base:'cream',   flavors:[{ id:'peach', value:100 }],                         fizz:40, temp:'chilled' },
+    { base:'mineral', flavors:[{ id:'cucumber', value:55 }, { id:'rose', value:35 }], fizz:70, temp:'ice' },
   ];
   examples.forEach((e, i) => {
     state.count += 1;
@@ -2379,7 +1979,7 @@ function bootRoute() {
   if (v === 'result') {
     let batch = state.lastBatch || state.saved[0];
     if (!batch) {
-      const mix = { base:'soda', flavors:['cherry','cola'], sweet:4, fizz:4, temp:'ice', finish:'glitter', charms:[{ id:'star', x:26, y:36, rot:-8 }] };
+      const mix = { base:'soda', flavors:[{ id:'cherry', value:80 }, { id:'cola', value:60 }], fizz:62, temp:'ice' };
       state.count += 1;
       batch = Object.assign({
         id: 'preview', num: state.count, name: makeName(mix),
@@ -2405,7 +2005,7 @@ load();
 const DEMO = !!new URLSearchParams(location.search).get('demo');
 if (DEMO) demoSeed();
 badges('init', {
-  FLAVORS, BASES, COMBO_NAMES, MAX_CHARMS, isObj, ID_RE, intIn,
+  FLAVORS, BASES, COMBO_NAMES, isObj, ID_RE, intIn,
   shelf: () => state.saved, count: () => state.count, demo: DEMO,
 });
 clock();
@@ -2416,7 +2016,6 @@ renderShelf();
 renderFlavorList();
 renderMix();
 updateTabs('home');
-initDeco();
 bootRoute();
 navState = { v: state.view, depth: 0, root: state.view };
 history.replaceState(navState, '', location.pathname + location.search + '#/' + state.view);

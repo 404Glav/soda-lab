@@ -91,22 +91,28 @@
             <div class="block">
               <div class="block-head">
                 <h3>Flavors</h3>
-                <span class="counter" id="flavorCount">0 / 3</span>
+                <span class="counter" id="flavorCount">None yet</span>
               </div>
-              <div class="chip-grid" id="flavorChips"></div>
+              <div class="mix-shares" id="mixShares" hidden></div>
+              <div class="fl-list" id="flavorSliders"></div>
+              <div class="fl-empty" id="flavorEmpty">
+                <p>Nothing in the cup yet.</p>
+                <button class="pill-btn" data-all-flavors>Browse all flavors</button>
+              </div>
+              <button class="text-btn show-all" id="showAllFlavors" hidden>Show all</button>
+              <div class="scale-note" id="scaleNote" hidden></div>
+              <button class="add-flavor-btn" data-all-flavors>
+                <span class="af-plus">+</span> Add a flavor
+              </button>
             </div>
 
             <div class="block">
-              <div class="block-head"><h3>Tune</h3></div>
-              <div class="dial" data-dial="sweet">
-                <div class="dial-top"><span>Sweetness</span><span class="dial-val" id="sweetVal">Balanced</span></div>
-                <input type="range" min="0" max="5" step="1" value="3" id="sweetRange" aria-label="Sweetness" />
-                <div class="ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
-              </div>
+              <div class="block-head"><h3>Fizz</h3></div>
               <div class="dial" data-dial="fizz">
-                <div class="dial-top"><span>Fizz</span><span class="dial-val" id="fizzVal">Crisp</span></div>
-                <input type="range" min="0" max="5" step="1" value="3" id="fizzRange" aria-label="Carbonation" />
-                <div class="ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                <div class="dial-top"><span>Carbonation</span><span class="dial-val" id="fizzVal">Regular</span></div>
+                <input type="range" min="0" max="100" step="1" value="50" id="fizzRange" aria-label="Carbonation" />
+                <div class="ticks ticks--4" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+                <div class="fizz-legend" aria-hidden="true"><span>Flat</span><span>Light</span><span>Regular</span><span>Extra</span></div>
               </div>
             </div>
 
@@ -115,23 +121,8 @@
               <div class="temp-row" id="tempRow"></div>
             </div>
 
-            <div class="block">
-              <div class="block-head">
-                <h3>Style</h3>
-                <span class="counter" id="charmCount">Optional</span>
-              </div>
-              <button class="style-row" data-open-deco>
-                <span class="style-swatch" id="styleSwatch"></span>
-                <span class="style-copy">
-                  <span class="style-name" id="styleName">Clear glass</span>
-                  <span class="style-sub" id="styleSub">Add a finish, glitter or charms</span>
-                </span>
-                <span class="fr-add">+</span>
-              </button>
-            </div>
-
             <div class="block block--note">
-              <p id="mixHint">Pick a base and up to three flavors. The lab handles the rest.</p>
+              <p id="mixHint">Add a flavor to start. Every slider is its own strength.</p>
             </div>
           </div>
 
@@ -151,10 +142,6 @@
               <h1 class="page-title">Shelf</h1>
             </div>
             <div class="head-actions">
-              <button class="merge-btn" id="mergeBtn" data-merge-start hidden>
-                <svg viewBox="0 0 24 24" width="15" height="15"><circle cx="9" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="15" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
-                Merge
-              </button>
               <button class="badge-btn" id="shelfBadges" data-go="badges" aria-label="Badges" hidden></button>
             </div>
           </header>
@@ -233,29 +220,6 @@
         <div class="sheet" id="sheet" role="dialog" aria-modal="true">
           <div class="sheet-grip" data-close-sheet></div>
           <div class="sheet-body" id="sheetBody"></div>
-        </div>
-      </div>
-
-      <div class="deco-layer" id="decoLayer" hidden>
-        <div class="deco-head">
-          <button class="text-btn" data-cancel-deco>Cancel</button>
-          <div class="deco-title">Decorate</div>
-          <button class="text-btn deco-done" data-close-deco>Done</button>
-        </div>
-        <div class="deco-stage" id="decoStage">
-          <div class="deco-wash" id="decoWash"></div>
-          <div class="deco-bottle" id="decoBottle"></div>
-          <div class="deco-hint" id="decoHint">Pick a charm, then tap the bottle</div>
-        </div>
-        <div class="deco-tray">
-          <div class="deco-tray-head">
-            <h3>Charms</h3>
-            <span class="counter" id="decoCount">0 charms</span>
-            <button class="text-btn" data-clear-charms>Clear</button>
-          </div>
-          <div class="charm-tray" id="charmTray"></div>
-          <div class="deco-tray-head"><h3>Finish</h3></div>
-          <div class="finish-row" id="decoFinishes"></div>
         </div>
       </div>
 

@@ -63,7 +63,7 @@ const SUFFIXES = ['Fizz','Spritz','Spark','Haze','Bloom','Noir','Crush','Drift',
 const COMBOS = {
   'cherry+cola':'Cherry Cola',
   'lemon+lime':'Citrus Split',
-  'grape+cream':'Grape Float',
+  'cream+grape':'Grape Float',
   'cream+rootbeer':'Root Beer Float',
   'cola+orange':'Orange Cola',
   'ginger+lime':'Ginger Lime',
@@ -75,28 +75,32 @@ const COMBOS = {
   'ginger+peach':'Peach Ginger',
   'lemon+rose':'Rose Lemonade',
   'berry+lime':'Wild Lime',
-  'cola+coffee':'Cola Noir',
+  'coffee+cola':'Cola Noir',
   'blueberry+lemon':'Blue Spark',
-  'raspberry+cream':'Raspberry Cream',
-  'mango+lime':'Mango Lime',
-  'passion+orange':'Passion Sun',
+  'cream+raspberry':'Raspberry Cream',
+  'lime+mango':'Mango Lime',
+  'orange+passion':'Passion Sun',
   'coconut+pineapple':'Island Fizz',
-  'vanilla+cherry':'Cherry Vanilla',
+  'cherry+vanilla':'Cherry Vanilla',
   'caramel+cola':'Salted Cola',
-  'hazelnut+coffee':'Hazel Brew',
-  'cinnamon+apple':'Spiced Orchard',
+  'coffee+hazelnut':'Hazel Brew',
+  'cinnamon+pear':'Spiced Orchard',
   'lavender+lemon':'Lavender Lemonade',
   'hibiscus+lime':'Hibiscus Lime',
-  'yuzu+ginger':'Yuzu Ginger',
+  'ginger+yuzu':'Yuzu Ginger',
   'bloodorange+cola':'Blood Orange Cola',
-  'pear+ginger':'Pear Ginger',
+  'ginger+pear':'Pear Ginger',
   'plum+vanilla':'Plum Velvet',
   'cardamom+cream':'Cardamom Cream',
-  'saltedlemon+mint':'Salted Mint',
-  'watermelon+mint':'Melon Cooler',
+  'mint+saltedlemon':'Salted Mint',
+  'mint+watermelon':'Melon Cooler',
   'anise+coffee':'Black Licorice Brew',
   'clove+orange':'Clove Orange',
 };
+
+// Keys are two flavor ids; lookups sort them, so write them in either order.
+const COMBO_NAMES = Object.fromEntries(
+  Object.entries(COMBOS).map(([k, v]) => [k.split('+').sort().join('+'), v]));
 
 const SWEET_WORDS = ['Bone dry','Barely sweet','Light','Balanced','Sweet','Candy'];
 const FIZZ_WORDS  = ['Still','Soft','Gentle','Crisp','Lively','Volcanic'];
@@ -269,7 +273,7 @@ function makeName(mix) {
 
   if (fs.length >= 2) {
     const key = [fs[0].id, fs[1].id].sort().join('+');
-    if (COMBOS[key]) return COMBOS[key];
+    if (COMBO_NAMES[key]) return COMBO_NAMES[key];
   }
 
   const h = hashStr(mix.flavors.join('') + mix.base + mix.sweet + mix.fizz);

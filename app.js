@@ -316,10 +316,12 @@ const BODY = 'M74 18 C74 33 84 41 90 57 C96 73 98 86 98 102 L98 210 C98 226 88 2
 let uidCounter = 0;
 
 /* liquid finishes: glitter, pearl, aurora, cosmic, ember */
-function finishLayer(finish, uid, color, surface) {
+function finishLayer(finish, uid, color, surface, still) {
   if (!finish || finish === 'none') return '';
   const rnd = mulberry32(420 + hashStr(color + finish));
   const bottom = 236;
+  // CSS animation hook; still thumbnails get none (the static attributes show instead)
+  const anim = (cls, dur, begin, extra = '') => still ? '' : ` class="${cls}" style="animation-duration:${dur}s;animation-delay:${begin}s${extra}"`;
 
   if (finish === 'glitter') {
     let dots = '';
@@ -329,13 +331,15 @@ function finishLayer(finish, uid, color, surface) {
       const r = .55 + rnd() * 1.25;
       const dur = (1.4 + rnd() * 2.6).toFixed(2);
       const begin = (-rnd() * 3).toFixed(2);
-      dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="#FFF2BE" opacity=".8"><animate attributeName="opacity" values=".12;1;.12" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/></circle>`;
+      dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="#FFF2BE" opacity=".8"${anim('tw', dur, begin, ';--lo:.12;--hi:1')}/>`;
     }
     for (let i = 0; i < 7; i++) {
       const x = 30 + rnd() * 60;
       const y = surface + 14 + rnd() * (bottom - surface - 26);
       const s = .8 + rnd() * 1.4;
-      dots += `<path d="M${x} ${y - s * 2.4} L${x + s * .55} ${y - s * .55} L${x + s * 2.4} ${y} L${x + s * .55} ${y + s * .55} L${x} ${y + s * 2.4} L${x - s * .55} ${y + s * .55} L${x - s * 2.4} ${y} L${x - s * .55} ${y - s * .55}Z" fill="#FFF9DC" opacity=".85"><animate attributeName="opacity" values=".1;.95;.1" dur="${(2.2 + rnd() * 2.4).toFixed(2)}s" begin="${(-rnd() * 4).toFixed(2)}s" repeatCount="indefinite"/></path>`;
+      const dur = (2.2 + rnd() * 2.4).toFixed(2);
+      const begin = (-rnd() * 4).toFixed(2);
+      dots += `<path d="M${x} ${y - s * 2.4} L${x + s * .55} ${y - s * .55} L${x + s * 2.4} ${y} L${x + s * .55} ${y + s * .55} L${x} ${y + s * 2.4} L${x - s * .55} ${y + s * .55} L${x - s * 2.4} ${y} L${x - s * .55} ${y - s * .55}Z" fill="#FFF9DC" opacity=".85"${anim('tw', dur, begin, ';--lo:.1;--hi:.95')}/>`;
     }
     return dots;
   }
@@ -343,7 +347,7 @@ function finishLayer(finish, uid, color, surface) {
   if (finish === 'pearl') {
     return `<g opacity=".62">
       <rect x="-30" y="${surface}" width="180" height="${bottom - surface}" fill="url(#pearl-${uid})"/>
-      <g><animateTransform attributeName="transform" type="translate" values="-34 0; 34 0; -34 0" dur="13s" repeatCount="indefinite"/>
+      <g${anim('pearl-drift', 13, 0)}>
         <ellipse cx="42" cy="${surface + (bottom - surface) * .32}" rx="34" ry="46" fill="#FFFFFF" opacity=".16"/>
         <ellipse cx="82" cy="${surface + (bottom - surface) * .66}" rx="30" ry="42" fill="#D9C6FF" opacity=".13"/>
       </g>
@@ -355,7 +359,7 @@ function finishLayer(finish, uid, color, surface) {
     const y2 = surface + (bottom - surface) * .52;
     const y3 = surface + (bottom - surface) * .76;
     return `<g opacity=".72">
-      <g><animateTransform attributeName="transform" type="translate" values="0 4; 0 -6; 0 4" dur="9s" repeatCount="indefinite"/>
+      <g${anim('aurora-drift', 9, 0)}>
         <path d="M-20 ${y1} C 18 ${y1 - 26}, 46 ${y1 + 28}, 82 ${y1 + 2} S 128 ${y1 - 18}, 150 ${y1 + 6} L150 ${bottom} L-20 ${bottom}Z" fill="url(#aur-a-${uid})"/>
         <path d="M-20 ${y2} C 24 ${y2 + 20}, 54 ${y2 - 24}, 90 ${y2 + 4} S 132 ${y2 + 22}, 150 ${y2 - 4} L150 ${bottom} L-20 ${bottom}Z" fill="url(#aur-b-${uid})" opacity=".8"/>
         <path d="M-20 ${y3} C 20 ${y3 - 16}, 52 ${y3 + 22}, 86 ${y3 - 2} S 130 ${y3 - 18}, 150 ${y3 + 8} L150 ${bottom} L-20 ${bottom}Z" fill="url(#aur-c-${uid})" opacity=".7"/>
@@ -369,13 +373,15 @@ function finishLayer(finish, uid, color, surface) {
       const x = 22 + rnd() * 76;
       const y = surface + 6 + rnd() * (bottom - surface - 12);
       const r = .35 + rnd() * 1.05;
-      stars += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="#FFFFFF" opacity=".9"><animate attributeName="opacity" values=".15;.95;.15" dur="${(1.8 + rnd() * 3.2).toFixed(2)}s" begin="${(-rnd() * 4).toFixed(2)}s" repeatCount="indefinite"/></circle>`;
+      const dur = (1.8 + rnd() * 3.2).toFixed(2);
+      const begin = (-rnd() * 4).toFixed(2);
+      stars += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="#FFFFFF" opacity=".9"${anim('tw', dur, begin, ';--lo:.15;--hi:.95')}/>`;
     }
     return `<g>
       <rect x="0" y="${surface}" width="120" height="${bottom - surface}" fill="#141029" opacity=".5"/>
       <ellipse cx="44" cy="${surface + (bottom - surface) * .38}" rx="46" ry="54" fill="url(#neb-a-${uid})" opacity=".85"/>
       <ellipse cx="86" cy="${surface + (bottom - surface) * .7}" rx="40" ry="46" fill="url(#neb-b-${uid})" opacity=".7"/>
-      <g><animateTransform attributeName="transform" type="rotate" values="0 60 ${(surface + bottom) / 2}; 360 60 ${(surface + bottom) / 2}" dur="46s" repeatCount="indefinite"/>
+      <g${anim('spin', 46, 0, `;transform-origin:60px ${(surface + bottom) / 2}px`)}>
         <ellipse cx="60" cy="${(surface + bottom) / 2}" rx="46" ry="18" fill="none" stroke="#B9A6FF" stroke-width="5" opacity=".12" transform="rotate(-24 60 ${(surface + bottom) / 2})"/>
       </g>
       ${stars}
@@ -390,7 +396,7 @@ function finishLayer(finish, uid, color, surface) {
       const r = .8 + rnd() * 1.7;
       const dur = (3 + rnd() * 3.4).toFixed(2);
       const begin = (-rnd() * 5).toFixed(2);
-      sparks += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="#FFB15C" opacity=".8"><animate attributeName="cy" values="${y.toFixed(1)};${(surface + 4).toFixed(1)}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;.9;0" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/></circle>`;
+      sparks += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="#FFB15C" opacity=".8"${anim('spark', dur, begin, `;--dy:${(surface + 4 - y).toFixed(1)}px`)}/>`;
     }
     return `<g><rect x="0" y="${surface}" width="120" height="${bottom - surface}" fill="url(#ember-${uid})" opacity=".35"/>${sparks}</g>`;
   }
@@ -398,12 +404,13 @@ function finishLayer(finish, uid, color, surface) {
   return '';
 }
 
+const bottleVars = c =>
+  `--l0:${lighten(c, .42)};--l1:${lighten(c, .30)};--l2:${c};--l3:${darken(c, .36)};--l4:${lighten(c, .52)};--l5:${lighten(c, .6)}`;
+
 function bottleSVG(opts) {
   const o = Object.assign({ color:'#9BD3E8', fill:.78, fizz:3, seed:1, animate:false, cls:'', finish:'none', still:false }, opts);
   const uid = 'v' + (++uidCounter);
   const color = o.color;
-  const light = lighten(color, .30);
-  const deep  = darken(color, .36);
   const surface = Math.round(226 - clamp(o.fill, .04, .94) * 168);
   const rx = clamp(30 + (surface - 58) / 44 * 7, 27, 37);
   const rise = -(226 - surface);
@@ -421,19 +428,19 @@ function bottleSVG(opts) {
   }
 
   const offset = o.animate ? (250 - surface) : 0;
-  const finish = finishLayer(o.finish, uid, color, surface);
+  const finish = finishLayer(o.finish, uid, color, surface, o.still);
   const capRidges = [44.5, 48.5, 52.5, 56.5, 60.5, 64.5, 68.5, 72.5, 76.5]
     .map(x => `<line x1="${x}" y1="6.4" x2="${x}" y2="18.4"/>`).join('');
 
-  return `<svg class="bottle ${o.cls} ${o.still ? 'bottle--still' : ''}" viewBox="0 0 120 250" role="img" aria-label="A bottle of soda">
+  return `<svg class="bottle ${o.cls} ${o.still ? 'bottle--still' : ''}" viewBox="0 0 120 250" role="img" aria-label="A bottle of soda" style="${bottleVars(color)}">
     <defs>
       <clipPath id="bc-${uid}"><path d="${BODY}"/></clipPath>
       <clipPath id="lc-${uid}"><rect x="0" y="${surface}" width="120" height="${252 - surface}"/></clipPath>
       <linearGradient id="lg-${uid}" x1=".12" y1="0" x2=".86" y2="1">
-        <stop offset="0" stop-color="${lighten(color, .42)}"/>
-        <stop offset=".2" stop-color="${light}"/>
-        <stop offset=".62" stop-color="${color}"/>
-        <stop offset="1" stop-color="${deep}"/>
+        <stop offset="0" style="stop-color:var(--l0)"/>
+        <stop offset=".2" style="stop-color:var(--l1)"/>
+        <stop offset=".62" style="stop-color:var(--l2)"/>
+        <stop offset="1" style="stop-color:var(--l3)"/>
       </linearGradient>
       <linearGradient id="dp-${uid}" x1="0" y1="${surface}" x2="0" y2="236" gradientUnits="userSpaceOnUse">
         <stop offset="0" stop-color="#000" stop-opacity="0"/>
@@ -504,7 +511,7 @@ function bottleSVG(opts) {
     </defs>
 
     <ellipse class="bottle-shadow" cx="60" cy="242.5" rx="35" ry="5.5"/>
-    <ellipse class="bottle-caustic" cx="60" cy="242" rx="26" ry="3.6" fill="${color}" opacity=".3"/>
+    <ellipse class="bottle-caustic" cx="60" cy="242" rx="26" ry="3.6" style="fill:var(--l2)" opacity=".3"/>
 
     <g clip-path="url(#bc-${uid})">
       <g class="liquid" style="transform:translateY(${offset}px)">
@@ -512,9 +519,9 @@ function bottleSVG(opts) {
         <rect x="0" y="${surface}" width="120" height="${252 - surface}" fill="url(#dp-${uid})"/>
         <g clip-path="url(#lc-${uid})">${finish}</g>
         <g clip-path="url(#lc-${uid})">${bubbles}</g>
-        <ellipse cx="60" cy="${surface}" rx="${rx}" ry="3.8" fill="${lighten(color, .52)}" opacity=".9"/>
+        <ellipse cx="60" cy="${surface}" rx="${rx}" ry="3.8" style="fill:var(--l4)" opacity=".9"/>
         <ellipse cx="60" cy="${surface - .8}" rx="${rx * .82}" ry="2.3" fill="#fff" opacity=".38"/>
-        <path d="M${60 - rx} ${surface} q ${rx} 4 ${rx * 2} 0" fill="none" stroke="${lighten(color, .6)}" stroke-width=".9" opacity=".7"/>
+        <path d="M${60 - rx} ${surface} q ${rx} 4 ${rx * 2} 0" fill="none" style="stroke:var(--l5)" stroke-width=".9" opacity=".7"/>
       </g>
 
       <path d="${BODY}" fill="url(#gl-${uid})"/>
@@ -546,19 +553,45 @@ function charmSVG(def) {
   return `<svg viewBox="0 0 24 24" aria-hidden="true">${def.art}</svg>`;
 }
 
+function charmHTML(c, i) {
+  const def = charmById(c.id);
+  return def ? `<span class="charm" data-charm-index="${i}" data-charm="${def.id}" style="left:${c.x}%;top:${c.y}%;--rot:${c.rot || 0}deg">${charmSVG(def)}</span>` : '';
+}
+
 function bottleStage(opts) {
   const o = Object.assign({ finish:'none', charms:[], cls:'', editable:false }, opts);
-  const charms = (o.charms || []).map((c, i) => {
-    const def = charmById(c.id);
-    if (!def) return '';
-    return `<span class="charm" data-charm-index="${i}" style="left:${c.x}%;top:${c.y}%;--rot:${c.rot || 0}deg">${charmSVG(def)}</span>`;
-  }).join('');
-  return `<div class="bottle-stage ${o.cls} ${o.editable ? 'is-editable' : ''}" data-bottle-stage>${bottleSVG(o)}${charms}</div>`;
+  const charms = (o.charms || []).map(charmHTML).join('');
+  return `<div class="bottle-stage ${o.cls} ${o.editable ? 'is-editable' : ''} ${o.still ? 'is-still' : ''}" data-bottle-stage>${bottleSVG(o)}${charms}</div>`;
+}
+
+/* Update a live bottle in place: repaint colors and move/add/remove charms.
+   The SVG is only rebuilt when its shape changes (fill, fizz, finish). */
+function syncStage(host, opts) {
+  const key = [opts.fill, opts.fizz, opts.seed, opts.finish].join('|');
+  const stage = host.firstElementChild;
+  if (!stage || stage.dataset.key !== key) {
+    host.innerHTML = bottleStage(opts);
+    host.firstElementChild.dataset.key = key;
+    return;
+  }
+  stage.querySelector('.bottle').style.cssText = bottleVars(opts.color);
+  const els = stage.querySelectorAll('.charm');
+  opts.charms.forEach((c, i) => {
+    if (!els[i]) return stage.insertAdjacentHTML('beforeend', charmHTML(c, i));
+    if (els[i].dataset.charm !== c.id) return void (els[i].outerHTML = charmHTML(c, i));
+    els[i].style.left = c.x + '%';
+    els[i].style.top = c.y + '%';
+    els[i].style.setProperty('--rot', `${c.rot || 0}deg`);
+  });
+  for (let i = opts.charms.length; i < els.length; i++) els[i].remove();
 }
 
 /* ───────────── state ───────────── */
 
 const KEY = 'sodalab.v1';
+
+// badges.js (loaded first) owns the badge store; this is the only way app.js talks to it.
+const badges = (fn, ...args) => (window.SodaBadges ? window.SodaBadges[fn](...args) : undefined);
 
 const defaultMix = () => ({ base:'soda', flavors:[], sweet:3, fizz:3, temp:'ice', finish:'none', charms:[] });
 
@@ -721,7 +754,7 @@ const TAB_VIEWS = ['home', 'shelf', 'flavors'];
    { v: view, depth: entries pushed since boot, root: view at depth 0 }.
    Tab-to-tab moves (except leaving the Lab) replace instead of push, so the
    phone's back button walks back through screens, not every tab tap. */
-const VIEW_RE = /^#\/(home|shelf|flavors|mix|result)\b/;
+const VIEW_RE = /^#\/(home|shelf|flavors|mix|result|badges)\b/;
 const viewFromHash = () => (location.hash.match(VIEW_RE) || [])[1] || null;
 let navState = { v: 'home', depth: 0, root: 'home' };
 
@@ -741,10 +774,18 @@ function historyModeFor(from, to) {
 
 /* go(name, dir = 'push' | 'pop' | 'fade', { history: 'push' | 'replace' | 'none' }) */
 function go(name, dir = 'push', opts = {}) {
+  if (name === 'badges' && !badgesOn()) name = 'home';
   const next = document.querySelector(`.view[data-view="${name}"]`);
   const cur  = document.querySelector('.view.is-active');
   if (!next || next === cur) return;
   writeHistory(name, opts.history || historyModeFor(state.view, name));
+
+  if (name === 'home')  { renderHome(); next.scrollTop = 0; }
+  if (name === 'shelf') { renderShelf(); next.scrollTop = 0; }
+  if (name === 'flavors') { renderFlavorList(); next.scrollTop = 0; }
+  if (name === 'mix')   { renderMix(); }
+  if (name === 'result') { $('#resultBody').scrollTop = 0; }
+  if (name === 'badges') { renderBadges(); next.scrollTop = 0; }
 
   const enterCls = dir === 'fade' ? 'enter-fade' : dir === 'pop' ? 'enter-left' : 'enter-right';
   next.classList.add(enterCls);
@@ -757,14 +798,8 @@ function go(name, dir = 'push', opts = {}) {
 
   state.view = name;
   tabbar.classList.toggle('is-hidden', !TAB_VIEWS.includes(name));
-
-  if (name === 'home')  { renderHome(); next.scrollTop = 0; }
-  if (name === 'shelf') { renderShelf(); next.scrollTop = 0; }
-  if (name === 'flavors') { renderFlavorList(); next.scrollTop = 0; }
-  if (name === 'mix')   { renderMix(); }
-  if (name === 'result') { $('#resultBody').scrollTop = 0; }
-
   updateTabs(name);
+  badgeRoute(name, next);
 }
 
 function updateTabs(name = state.view) {
@@ -825,6 +860,7 @@ document.addEventListener('click', e => {
     return;
   }
   if (e.target.closest('[data-back]')) { e.preventDefault(); back(); }
+  if (e.target.closest('[data-badges-back]')) { e.preventDefault(); badgesBack(); }
 });
 
 /* ───────────── home ───────────── */
@@ -858,6 +894,7 @@ function renderHome() {
     <div class="hero-art">${bottleStage({ color, fill:.8, fizz:mix.fizz, seed:7, finish:mix.finish, charms:mix.charms })}</div>`;
 
   hero.onclick = () => go('mix', 'push');
+  renderHomeBadges();
 
   const row = $('#homeShelf');
   if (!state.saved.length) {
@@ -929,7 +966,7 @@ function renderMix() {
     radial-gradient(52% 48% at 50% 40%, ${rgba(color, .34)} 0%, ${rgba(color, .10)} 52%, transparent 74%),
     radial-gradient(40% 42% at 24% 62%, ${rgba(lighten(color,.3), .30)} 0%, transparent 70%)`;
 
-  $('#mixBottle').innerHTML = bottleStage({
+  syncStage($('#mixBottle'), {
     color, fill: derived.fill, fizz: mix.fizz, seed: 21,
     finish: mix.finish, charms: mix.charms,
   });
@@ -937,25 +974,31 @@ function renderMix() {
   $('#mixName').textContent = derived.name;
   $('#mixSub').textContent = derived.sub;
 
-  // base options
-  $('#baseRow').innerHTML = BASES.map(b => `
-    <button class="base-opt" data-base="${b.id}" aria-pressed="${mix.base === b.id}">
+  // base options (built once, then only their pressed state changes)
+  const baseRow = $('#baseRow');
+  if (!baseRow.firstElementChild) baseRow.innerHTML = BASES.map(b => `
+    <button class="base-opt" data-base="${b.id}">
       <span class="dot" style="background:${b.color}"></span>
       <span class="lbl">${b.name}</span>
     </button>`).join('');
+  baseRow.querySelectorAll('[data-base]').forEach(el => el.setAttribute('aria-pressed', mix.base === el.dataset.base));
 
-  // flavor chips
+  // flavor chips: fixed slots, refilled in place
   const visible = visibleFlavors();
-  $('#flavorChips').innerHTML = visible.map(f => {
-    const on = mix.flavors.includes(f.id);
-    const locked = !on && mix.flavors.length >= 3;
-    return `<button class="chip ${locked ? 'is-locked' : ''}" data-flavor-toggle="${f.id}" aria-pressed="${on}">
-      <span class="sw" style="background:${f.color}"></span>
-      <span class="nm">${f.name}</span>
-    </button>`;
-  }).join('') + `<button class="chip chip--wide" data-all-flavors>
+  const chipHost = $('#flavorChips');
+  if (chipHost.children.length !== visible.length + 1) chipHost.innerHTML = visible.map(() => `
+    <button class="chip"><span class="sw"></span><span class="nm"></span></button>`).join('') + `<button class="chip chip--wide" data-all-flavors>
       <span class="nm">All ${FLAVORS.length} flavors</span>
     </button>`;
+  visible.forEach((f, i) => {
+    const el = chipHost.children[i];
+    const on = mix.flavors.includes(f.id);
+    el.dataset.flavorToggle = f.id;
+    el.setAttribute('aria-pressed', on);
+    el.classList.toggle('is-locked', !on && mix.flavors.length >= 3);
+    el.firstElementChild.style.background = f.color;
+    el.lastElementChild.textContent = f.name;
+  });
 
   $('#flavorCount').textContent = `${mix.flavors.length} / 3`;
 
@@ -964,8 +1007,10 @@ function renderMix() {
   syncDial('fizz');
 
   // serve
-  $('#tempRow').innerHTML = TEMPS.map(t => `
-    <button class="temp-opt" data-temp="${t.id}" aria-pressed="${mix.temp === t.id}">${t.label}</button>`).join('');
+  const tempRow = $('#tempRow');
+  if (!tempRow.firstElementChild) tempRow.innerHTML = TEMPS.map(t => `
+    <button class="temp-opt" data-temp="${t.id}">${t.label}</button>`).join('');
+  tempRow.querySelectorAll('[data-temp]').forEach(el => el.setAttribute('aria-pressed', mix.temp === el.dataset.temp));
 
   // style
   const fin = finishById(mix.finish);
@@ -1036,7 +1081,9 @@ function toggleFlavor(id) {
 
 /* ───────────── brewing ───────────── */
 
-let brewTimers = [];
+let brewRaf = 0;
+const BREW_STEP = 640, BREW_TOTAL = 2960, BREW_BAR = [22, 52, 80, 100];
+const setBrewBar = pct => { brewBar.style.transform = `translateX(${pct - 100}%)`; };
 
 function makeBatch(mix) {
   state.count += 1;
@@ -1073,7 +1120,7 @@ function runBrew(batch, steps) {
   });
   brewStep.textContent = steps[0];
   brewStep.style.opacity = 1;
-  brewBar.style.width = '0%';
+  setBrewBar(0);
 
   brewLayer.hidden = false;
   void brewLayer.offsetWidth;
@@ -1084,17 +1131,28 @@ function runBrew(batch, steps) {
     if (liquid) liquid.style.transform = 'translateY(0)';
   }));
 
-  const widths = ['22%', '52%', '80%', '100%'];
-  brewTimers.forEach(clearTimeout);
-  brewTimers = steps.map((s, i) => setTimeout(() => {
-    if (i > 0) {
-      brewStep.style.opacity = 0;
-      setTimeout(() => { brewStep.textContent = s; brewStep.style.opacity = 1; }, 160);
-    }
-    brewBar.style.width = widths[Math.min(i, widths.length - 1)];
-  }, i * 640));
+  afterTransition(brewLayer, 600, () => views.classList.toggle('is-covered', brewLayer.classList.contains('is-open')));
 
-  brewTimers.push(setTimeout(finishBrew, 2960));
+  // One clock drives the steps, the label swap and the finish.
+  let t0 = null, step = -1;
+  cancelAnimationFrame(brewRaf);
+  const tick = now => {
+    if (t0 === null) t0 = now;
+    const t = now - t0;
+    if (t >= BREW_TOTAL) { brewRaf = 0; finishBrew(); return; }
+    const i = Math.min(steps.length - 1, Math.floor(t / BREW_STEP));
+    if (i !== step) {
+      step = i;
+      setBrewBar(BREW_BAR[Math.min(i, BREW_BAR.length - 1)]);
+      if (i > 0) brewStep.style.opacity = 0;
+    }
+    if (i > 0 && brewStep.textContent !== steps[i] && t - i * BREW_STEP >= 160) {
+      brewStep.textContent = steps[i];
+      brewStep.style.opacity = 1;
+    }
+    brewRaf = requestAnimationFrame(tick);
+  };
+  brewRaf = requestAnimationFrame(tick);
 }
 
 function startBrew() {
@@ -1105,10 +1163,12 @@ function startBrew() {
 function finishBrew() {
   const batch = state.pending;
   brewLayer.classList.remove('is-open');
+  views.classList.remove('is-covered');
   setTimeout(() => { brewLayer.hidden = true; }, 460);
   if (!batch) return;
   state.lastBatch = batch;
   state.pending = null;
+  badges('evaluateBadges', batch.merged ? 'merge' : 'brew', { batch });   // once per brew, never in renderResult
   renderResult(batch, true);
   go('result', 'push');
   persist();
@@ -1198,13 +1258,14 @@ function renderResult(batch, fresh) {
     </div>`;
 
   requestAnimationFrame(() => {
-    $$('#resultBody .bar-fill').forEach(el => { el.style.width = el.dataset.w + '%'; });
+    $$('#resultBody .bar-fill').forEach(el => { el.style.transform = `translateX(${el.dataset.w - 100}%)`; });
   });
 
   $('#saveBtn')?.addEventListener('click', () => {
     if (state.saved.some(b => b.id === batch.id)) return;
     state.saved.unshift(batch);
     persist();
+    badges('evaluateBadges', 'save', { batch });
     const btn = $('#saveBtn');
     btn.textContent = 'Saved to shelf';
     btn.disabled = true;
@@ -1215,6 +1276,7 @@ function renderResult(batch, fresh) {
   });
 
   $('#againBtn')?.addEventListener('click', () => {
+    badges('clearRemixFrom');
     state.mix = defaultMix();
     persist();
     renderMix();
@@ -1264,6 +1326,7 @@ function renderShelf() {
   const empty = $('#shelfEmpty');
   const mergeBtn = $('#mergeBtn');
   if (mergeBtn) mergeBtn.hidden = state.saved.length < 2;
+  renderShelfBadges();
   const eyebrow = document.querySelector('[data-view="shelf"] .eyebrow');
   if (eyebrow) eyebrow.textContent = state.saved.length
     ? `Your collection · ${state.saved.length} bottle${state.saved.length === 1 ? '' : 's'}`
@@ -1321,19 +1384,37 @@ function renderFlavorList() {
 
 /* ───────────── sheets ───────────── */
 
-let sheetTimer = null;
+/* Runs fn once el's own transition ends, or after ms if none fires. */
+function afterTransition(el, ms, fn) {
+  let timer;
+  const done = e => {
+    if (e && e.target !== el) return;
+    el.removeEventListener('transitionend', done);
+    clearTimeout(timer);
+    fn();
+  };
+  el.addEventListener('transitionend', done);
+  timer = setTimeout(done, ms);
+}
+
+let sheetGen = 0;   // bumps on every open/close so a stale close never hides a reopened sheet
 
 function openSheet(html) {
-  clearTimeout(sheetTimer);
+  sheetGen++;
   sheetBody.innerHTML = html;
   sheetLayer.hidden = false;
   void sheetLayer.offsetWidth;
   sheetLayer.classList.add('is-open');
 }
-function closeSheet() {
+/* then: runs after the sheet is fully down, e.g. to navigate or open the next sheet. */
+function closeSheet(then) {
+  const gen = ++sheetGen;
   sheetLayer.classList.remove('is-open');
-  clearTimeout(sheetTimer);
-  sheetTimer = setTimeout(() => { sheetLayer.hidden = true; }, 520);
+  afterTransition($('#sheet'), 600, () => {
+    if (gen !== sheetGen) return;
+    sheetLayer.hidden = true;
+    if (then) then();
+  });
 }
 
 sheetLayer.addEventListener('click', e => {
@@ -1533,8 +1614,7 @@ function doMerge() {
   const picks = mergeCandidates();
   if (picks.length !== 2) return;
   const batch = makeMergedBatch(picks[0], picks[1]);
-  closeSheet();
-  setTimeout(() => runBrew(batch, ['Melting the two', 'Fusing the colors', 'Re-carbonating', 'Sealing the blend']), 300);
+  closeSheet(() => runBrew(batch, ['Melting the two', 'Fusing the colors', 'Re-carbonating', 'Sealing the blend']));
 }
 
 function openAllFlavors() {
@@ -1580,16 +1660,20 @@ function openDeco() {
   const layer = $('#decoLayer');
   if (!layer) return;
   decoSnapshot = { finish: state.mix.finish, charms: state.mix.charms.map(c => ({ ...c })) };
+  renderDeco();
   layer.hidden = false;
   void layer.offsetWidth;
   layer.classList.add('is-open');
-  renderDeco();
+  // the layer is opaque: pause the screens underneath once it covers them
+  afterTransition(layer, 600, () => views.classList.toggle('is-covered', layer.classList.contains('is-open')));
 }
 
 function closeDeco() {
   const layer = $('#decoLayer');
   if (!layer) return;
   layer.classList.remove('is-open');
+  views.classList.remove('is-covered');
+  if (toastEl.classList.contains('has-action')) hideToast();   // its Undo belongs to Decorate
   decoSnapshot = null;
   setTimeout(() => { layer.hidden = true; }, 380);
   persist();
@@ -1614,28 +1698,23 @@ function renderDeco() {
       radial-gradient(52% 46% at 50% 40%, ${rgba(color, .34)} 0%, ${rgba(color, .10)} 54%, transparent 76%),
       radial-gradient(40% 42% at 24% 64%, ${rgba(lighten(color,.3), .30)} 0%, transparent 70%)`;
   }
-  const host = $('#decoBottle');
-  if (host) {
-    host.innerHTML = bottleStage({
-      color, fill: mix.flavors.length ? .84 : .66, fizz: mix.fizz, seed: 33,
-      finish: mix.finish, charms: mix.charms, editable: true,
-    });
-  }
+  syncStage($('#decoBottle'), {
+    color, fill: mix.flavors.length ? .84 : .66, fizz: mix.fizz, seed: 33,
+    finish: mix.finish, charms: mix.charms, editable: true,
+  });
   const tray = $('#charmTray');
-  if (tray) {
-    tray.innerHTML = CHARMS.map(c => `
-      <button class="charm-opt ${state.charmSel === c.id ? 'is-on' : ''}" data-charm-sel="${c.id}" aria-label="${c.name}">
+  if (!tray.firstElementChild) tray.innerHTML = CHARMS.map(c => `
+      <button class="charm-opt" data-charm-sel="${c.id}" aria-label="${c.name}">
         ${charmSVG(c)}<span>${c.name}</span>
       </button>`).join('');
-  }
+  tray.querySelectorAll('[data-charm-sel]').forEach(el => el.classList.toggle('is-on', state.charmSel === el.dataset.charmSel));
   const finRow = $('#decoFinishes');
-  if (finRow) {
-    finRow.innerHTML = FINISHES.map(f => `
-      <button class="finish-opt ${mix.finish === f.id ? 'is-on' : ''}" data-finish="${f.id}" aria-label="${f.name}">
+  if (!finRow.firstElementChild) finRow.innerHTML = FINISHES.map(f => `
+      <button class="finish-opt" data-finish="${f.id}" aria-label="${f.name}">
         <span class="finish-sw" style="background:${swatchFor(f)}"></span>
         <span class="finish-nm">${f.name}</span>
       </button>`).join('');
-  }
+  finRow.querySelectorAll('[data-finish]').forEach(el => el.classList.toggle('is-on', mix.finish === el.dataset.finish));
   const hint = $('#decoHint');
   if (hint) hint.textContent = mix.charms.length
     ? 'Tap the bottle to add · drag to move · tap a charm to remove'
@@ -1655,68 +1734,453 @@ function placeCharm(rect, cx, cy) {
   renderDeco();
 }
 
+/* Removing charms can be undone from the toast while Decorate is open. */
+function removeCharms(indexes, msg) {
+  const before = state.mix.charms;
+  state.mix.charms = before.filter((c, i) => !indexes.includes(i));
+  persist();
+  renderDeco();
+  toast(msg, { label: 'Undo', run: () => {
+    state.mix.charms = sanitizeCharms(before);
+    persist();
+    renderDeco();
+  } });
+}
+
 function initDeco() {
   const stage = $('#decoStage');
   if (!stage) return;
-  let drag = null;
-  const bottleRect = () => (stage.querySelector('.bottle-stage') || stage).getBoundingClientRect();
+  const TAP_SLOP = 8;   // px a press may wander and still count as a tap
+  let press = null, raf = 0;
+
+  // where the pressed charm would land, in % of the bottle, from the press origin
+  const landing = p => {
+    const c = state.mix.charms[p.idx];
+    return {
+      x: clamp(c.x + p.dx / p.rect.width * 100, 4, 96),
+      y: clamp(c.y + p.dy / p.rect.height * 100, 4, 96),
+    };
+  };
+  const moveCharm = () => {
+    raf = 0;
+    if (!press || !press.dragging) return;
+    const c = state.mix.charms[press.idx], to = landing(press);
+    press.el.style.translate = `${(to.x - c.x) * press.rect.width / 100}px ${(to.y - c.y) * press.rect.height / 100}px`;
+  };
 
   stage.addEventListener('pointerdown', e => {
-    const charmEl = e.target.closest('.charm');
-    if (charmEl) {
-      drag = { idx: Number(charmEl.dataset.charmIndex), moved: false, x0: e.clientX, y0: e.clientY, el: charmEl, x: 0, y: 0 };
-      charmEl.classList.add('is-dragging');
-      try { stage.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-      e.preventDefault();
-      return;
-    }
-    if (!e.target.closest('[data-bottle-stage]')) return;
-    placeCharm(bottleRect(), e.clientX, e.clientY);
+    const host = e.target.closest('[data-bottle-stage]');
+    if (press || !host) return;
+    const el = e.target.closest('.charm');
+    press = {
+      id: e.pointerId, el, idx: el ? Number(el.dataset.charmIndex) : -1,
+      x0: e.clientX, y0: e.clientY, dx: 0, dy: 0, dragging: false,
+      rect: host.getBoundingClientRect(),   // read once per press, never during the move
+    };
+    if (el) { el.classList.add('is-dragging'); e.preventDefault(); }
+    try { stage.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
   });
 
   stage.addEventListener('pointermove', e => {
-    if (!drag) return;
-    if (Math.abs(e.clientX - drag.x0) + Math.abs(e.clientY - drag.y0) > 5) drag.moved = true;
-    const rect = bottleRect();
-    const x = clamp((e.clientX - rect.left) / rect.width * 100, 4, 96);
-    const y = clamp((e.clientY - rect.top) / rect.height * 100, 4, 96);
-    drag.el.style.left = x + '%';
-    drag.el.style.top = y + '%';
-    drag.x = x;
-    drag.y = y;
+    if (!press || e.pointerId !== press.id) return;
+    press.dx = e.clientX - press.x0;
+    press.dy = e.clientY - press.y0;
+    if (!press.dragging && Math.hypot(press.dx, press.dy) < TAP_SLOP) return;
+    press.dragging = true;
+    if (press.el && !raf) raf = requestAnimationFrame(moveCharm);
   });
 
-  const end = () => {
-    if (!drag) return;
-    const d = drag;
-    drag = null;
-    d.el.classList.remove('is-dragging');
-    const mix = state.mix;
-    if (!d.moved) {
-      mix.charms.splice(d.idx, 1);
-      toast('Charm removed');
-      persist();
-      renderDeco();
-      return;
-    }
-    if (mix.charms[d.idx]) {
-      mix.charms[d.idx].x = Math.round(d.x);
-      mix.charms[d.idx].y = Math.round(d.y);
-    }
+  const end = e => {
+    if (!press || e.pointerId !== press.id) return;
+    const p = press;
+    press = null;
+    cancelAnimationFrame(raf);
+    raf = 0;
+    const tap = !p.dragging && e.type === 'pointerup';
+    if (!p.el) { if (tap) placeCharm(p.rect, p.x0, p.y0); return; }
+    p.el.classList.remove('is-dragging');
+    if (tap) { removeCharms([p.idx], 'Charm removed'); return; }
+    if (!p.dragging || !state.mix.charms[p.idx]) return;
+    const c = state.mix.charms[p.idx], to = landing(p);
+    c.x = Math.round(to.x);
+    c.y = Math.round(to.y);
+    p.el.style.translate = '';
+    p.el.style.left = c.x + '%';
+    p.el.style.top = c.y + '%';
     persist();
   };
   stage.addEventListener('pointerup', end);
   stage.addEventListener('pointercancel', end);
 }
 
+/* ───────────── badges (UI over window.SodaBadges) ───────────── */
+
+/* Forge's badges.js owns the data; everything here only reads it. Art lives in
+   icons/badges: <icon>.svg earned, <icon>-locked.svg locked, mystery.svg for
+   any unearned hidden badge. Tier colours come from .tier-<tier> in styles.css. */
+const BADGE_THEMES = { brewing:'Brewing', rarity:'Rarity', variety:'Variety', combos:'Combos', merging:'Merging', daily:'Daily' };
+const BADGE_UNITS = { 'lab-regular':'brews', 'base-tour':'bases', 'pantry-explorer':'flavors', 'combo-hunter':'combos' };
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+const badgesOn = () => !!window.SodaBadges && !DEMO;
+const tierRank = t => window.SodaBadges.TIERS.indexOf(t);
+const unseenCount = s => (Array.isArray(s.unseen) ? s.unseen.length : s.unseen) || 0;
+const badgeSrc = b => `icons/badges/${b.earnedAt ? b.icon : b.hidden ? 'mystery' : b.icon + '-locked'}.svg`;
+const badgeImg = (b, px) => `<img class="b-art" src="${esc(badgeSrc(b))}" width="${px}" height="${px}" alt="" decoding="async" draggable="false">`;
+const badgeDate = (ts, year) => new Date(ts).toLocaleDateString(undefined, year ? { month:'short', day:'numeric', year:'numeric' } : { month:'short', day:'numeric' });
+const progressLabel = b => `${Number(b.progress.n)} / ${Number(b.progress.of)}${BADGE_UNITS[b.id] ? ' ' + BADGE_UNITS[b.id] : ''}`;
+const firstSentence = s => (String(s).match(/^.*?[.!?](\s|$)/) || [s])[0].trim();
+const barFill = (n, of) => `<span class="b-bar"><span style="transform:translateX(${Math.round(Math.min(1, n / of) * 100) - 100}%)"></span></span>`;
+const byTier = list => list.slice().sort((a, b) => tierRank(b.tier) - tierRank(a.tier));
+const topEarned = (list, n) => byTier(list.filter(b => b.earnedAt)).slice(0, n);
+const getBadge = id => window.SodaBadges.getBadges().find(b => b.id === id);
+const badgeTotals = () => { const s = window.SodaBadges.badgeSummary(); return { earned: Number(s.earned) || 0, total: Number(s.total) || 0, unseen: unseenCount(s) }; };
+const setHTML = (el, html) => { if (el._html !== html) { el._html = html; el.innerHTML = html; } };
+
+function badgeFan(list, px) {
+  return `<span class="b-fan">${list.map((b, i) => `<span class="tier-${esc(b.tier)}" style="z-index:${3 - i}">${badgeImg(b, px)}</span>`).join('')}</span>`;
+}
+
+/* Lab row + Shelf header button (rendered with their screens, in place) */
+function renderHomeBadges() {
+  const host = $('#homeBadges');
+  if (!badgesOn()) { host.hidden = true; return; }
+  const all = window.SodaBadges.getBadges();
+  const sum = badgeTotals();
+  const unseen = sum.unseen;
+  const fan = sum.earned ? topEarned(all, 3) : ['first-pour', 'shelf-starter', 'full-glass'].map(id => all.find(b => b.id === id)).filter(Boolean);
+  host.hidden = false;
+  setHTML(host, `
+    <button class="badge-row" data-go="badges">
+      ${badgeFan(fan, 36)}
+      <span class="badge-row-copy">
+        <span class="badge-row-name">Badges</span>
+        <span class="badge-row-sub">${sum.earned} of ${sum.total} earned${unseen ? ` · ${unseen} new` : ''}</span>
+      </span>
+      ${unseen ? '<i class="b-dot" aria-label="New badges"></i>' : ''}
+      <svg class="daily-chev" viewBox="0 0 24 24" width="18" height="18"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>`);
+}
+
+function renderShelfBadges() {
+  const btn = $('#shelfBadges');
+  if (!badgesOn()) { btn.hidden = true; return; }
+  const sum = badgeTotals();
+  const top = topEarned(window.SodaBadges.getBadges(), 1)[0];
+  btn.hidden = false;
+  btn.setAttribute('aria-label', `Badges, ${sum.earned} of ${sum.total}`);
+  setHTML(btn, `${top ? badgeImg(top, 26) : '<img class="b-art" src="icons/badges/mystery.svg" width="26" height="26" alt="">'}
+    <span>${sum.earned} / ${sum.total}</span>${sum.unseen ? '<i class="b-dot"></i>' : ''}`);
+}
+
+/* #/badges */
+let badgeSeenIO = null;
+
+function badgeTile(b) {
+  const masked = b.hidden && !b.earnedAt;
+  const sub = b.earnedAt ? badgeDate(b.earnedAt)
+    : masked ? firstSentence(b.hint || '')
+    : b.progress ? progressLabel(b)
+    : b.short || b.how;
+  return `
+    <button class="badge-tile tier-${esc(b.tier)}${b.earnedAt ? ' is-earned' : ''}" data-badge="${esc(b.id)}">
+      ${badgeImg(b, 64)}
+      <span class="bt-name">${esc(masked ? '?' : b.name)}</span>
+      <span class="bt-sub">${esc(sub)}</span>
+      ${!b.earnedAt && b.progress ? barFill(b.progress.n, b.progress.of) : ''}
+      ${b.unseen ? '<i class="b-dot"></i>' : ''}
+    </button>`;
+}
+
+function renderBadges() {
+  const all = window.SodaBadges.getBadges();
+  const sum = badgeTotals();
+  const unseen = sum.unseen;
+  const tiers = window.SodaBadges.TIERS.filter(t => all.some(b => b.tier === t));
+  const themes = [...new Set([...Object.keys(BADGE_THEMES), ...all.map(b => b.theme)])].filter(t => all.some(b => b.theme === t));
+  setHTML($('#badgesBody'), `
+    <div class="badge-summary">
+      <div class="eyebrow">Badges earned</div>
+      <div class="bs-count"><b>${sum.earned}</b><span>of ${sum.total}</span></div>
+      ${unseen ? `<span class="bs-new"><i></i>${unseen} new</span>` : ''}
+      ${barFill(sum.earned, sum.total).replace('b-bar', 'b-bar bs-bar')}
+      <div class="bs-tiers" style="--cols:${tiers.length}">${tiers.map(t => {
+        const of = all.filter(b => b.tier === t);
+        return `<span class="tier-${esc(t)}"><i></i>${of.filter(b => b.earnedAt).length}/${of.length}</span>`;
+      }).join('')}</div>
+    </div>
+    ${themes.map(t => {
+      const list = all.filter(b => b.theme === t);
+      return `<div class="section-head"><h2>${esc(BADGE_THEMES[t] || cap(t))}</h2><span class="link">${list.filter(b => b.earnedAt).length} of ${list.length}</span></div>
+        <div class="badge-grid">${list.map(badgeTile).join('')}</div>`;
+    }).join('')}`);
+  watchUnseen();
+}
+
+// An unseen tile counts as seen once most of it has been on screen; its dot then fades.
+function watchUnseen() {
+  if (badgeSeenIO) badgeSeenIO.disconnect();
+  const tiles = $$('#badgesBody .badge-tile .b-dot').map(d => d.parentElement);
+  if (!tiles.length) return;
+  badgeSeenIO = new IntersectionObserver(entries => {
+    const ids = entries.filter(e => e.isIntersecting).map(e => e.target);
+    if (!ids.length) return;
+    ids.forEach(el => { badgeSeenIO.unobserve(el); el.classList.add('is-seen'); });
+    window.SodaBadges.markBadgesSeen(ids.map(el => el.dataset.badge));
+  }, { root: $('.view[data-view="badges"]'), threshold: .6 });
+  tiles.forEach(el => badgeSeenIO.observe(el));
+}
+
+function badgesBack() {
+  if (navState.depth > 0) history.back();
+  else go('home', 'pop', { history: 'replace' });
+}
+
+function openBadgeSheet(id) {
+  const b = getBadge(id);
+  if (!b) return;
+  window.SodaBadges.markBadgesSeen([id]);
+  document.querySelector(`.badge-tile[data-badge="${CSS.escape(id)}"]`)?.classList.add('is-seen');
+  const masked = b.hidden && !b.earnedAt;
+  const bottle = b.batchExists ? state.saved.find(x => x.id === b.batch) : null;
+  const group = esc(BADGE_THEMES[b.theme] || cap(b.theme));
+  const li = (k, v) => `<div class="sheet-li"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+  const rows = b.earnedAt ? [
+      li('Earned', badgeDate(b.earnedAt, true)), li('Group', group),
+      b.batch ? (bottle
+        ? `<button class="sheet-li" data-badge-bottle="${esc(bottle.id)}"><span class="k">Bottle</span><span class="v bsh-bottle"><i style="background:${bottle.color}"></i>${esc(bottle.name)}<svg viewBox="0 0 24 24" width="16" height="16"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>`
+        : li('Bottle', '<span class="bsh-gone">No longer on your shelf</span>')) : '']
+    : masked ? [li('How to earn', '?'), li('Group', group)]
+    : [li('Group', group), li('Progress', b.progress ? esc(progressLabel(b)) : 'Not yet')];
+  openSheet(`
+    <div class="bsh-hero tier-${esc(b.tier)}${b.earnedAt ? ' is-earned' : ''}">${badgeImg(b, 140)}</div>
+    <span class="tier-chip tier-${masked ? 'common' : esc(b.tier)}">${masked ? 'Hidden' : esc(cap(b.tier))}</span>
+    <h2 class="sheet-title bsh-title">${esc(masked ? '?' : b.name)}</h2>
+    <p class="sheet-desc bsh-desc">${esc(masked ? b.hint || '?' : b.how.replace(/\.?$/, '.'))}</p>
+    ${!b.earnedAt && b.progress ? barFill(b.progress.n, b.progress.of).replace('b-bar', 'b-bar bsh-bar') : ''}
+    <div class="sheet-list">${rows.join('')}</div>
+    ${bottle ? `<div class="sheet-actions"><button class="btn-primary" data-badge-bottle="${esc(bottle.id)}">View bottle</button></div>` : ''}`);
+}
+
+/* ── unlock banner queue ──
+   Items: { kind:'badge', id, i, total } | { kind:'more', ids } | { kind:'welcome', count }.
+   One banner at a time, 160 ms apart. Unlocks from a brew or merge wait until
+   #/result has settled; a save waits 300 ms. Nothing is dropped. */
+const bbLayer = $('#bbLayer');
+const BB = { queue: [], cur: null, peeks: [], holdForResult: false, notBefore: 0, welcomeAt: 0, gapUntil: 0, timer: 0, gate: 0, sheet: false };
+const sparkle = '<svg viewBox="0 0 24 24"><path d="M12 0c.8 6.4 5.6 11.2 12 12-6.4.8-11.2 5.6-12 12-.8-6.4-5.6-11.2-12-12C6.4 11.2 11.2 6.4 12 0Z"/></svg>';
+
+document.addEventListener('badges:unlock', e => {
+  if (!badgesOn()) return;
+  const ids = (e.detail && e.detail.ids) || [];
+  if (!ids.length) return;
+  ids.slice(0, 3).forEach((id, i) => BB.queue.push({ kind:'badge', id, i: i + 1, total: ids.length }));
+  if (ids.length > 3) BB.queue.push({ kind:'more', ids: ids.slice(3) });
+  if (e.detail.source === 'brew' || e.detail.source === 'merge') {
+    BB.holdForResult = true;
+    clearTimeout(BB.gate);
+    BB.gate = setTimeout(releaseResultHold, 1500);   // safety net if Result never opens
+  } else {
+    BB.notBefore = Math.max(BB.notBefore, performance.now() + 300);
+  }
+  refreshBadgeEntry();
+  pumpBanners();
+});
+
+document.addEventListener('badges:welcome', e => {
+  if (!badgesOn() || !(e.detail && e.detail.count > 0)) return;
+  BB.queue.unshift({ kind:'welcome', count: Number(e.detail.count) });
+  BB.welcomeAt = Infinity;
+  // 800 ms after the first paint that follows load
+  requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => { BB.welcomeAt = 0; pumpBanners(); }, 800)));
+});
+
+function releaseResultHold() {
+  clearTimeout(BB.gate);
+  if (!BB.holdForResult) return;
+  BB.holdForResult = false;
+  pumpBanners();
+}
+
+// Called by go(): the first banner starts on Result's transform transitionend + 240 ms (720 ms at most).
+function badgeRoute(name, el) {
+  if (name !== 'badges' && badgeSeenIO) { badgeSeenIO.disconnect(); badgeSeenIO = null; }
+  if (!BB.holdForResult) return;
+  clearTimeout(BB.gate);
+  if (name !== 'result') { BB.gate = setTimeout(releaseResultHold, 240); return; }
+  BB.gate = setTimeout(releaseResultHold, 720);
+  if (reducedMotion.matches) return;
+  const done = e => {
+    if (e.target !== el || e.propertyName !== 'transform') return;
+    el.removeEventListener('transitionend', done);
+    clearTimeout(BB.gate);
+    BB.gate = setTimeout(releaseResultHold, 240);
+  };
+  el.addEventListener('transitionend', done);
+}
+
+function refreshBadgeEntry() {
+  if (state.view === 'home') renderHomeBadges();
+  if (state.view === 'shelf') renderShelfBadges();
+  if (state.view === 'badges') renderBadges();
+}
+
+function pumpBanners() {
+  clearTimeout(BB.timer);
+  if (BB.cur || !BB.queue.length) return;
+  const head = BB.queue[0];
+  if (BB.sheet || (head.kind !== 'welcome' && BB.holdForResult)) { layoutPeeks(0, 0); return; }
+  const wait = Math.max(head.kind === 'welcome' ? BB.welcomeAt : BB.notBefore, BB.gapUntil) - performance.now();
+  if (wait === Infinity) return;
+  if (wait > 0) { BB.timer = setTimeout(pumpBanners, wait); return; }
+  showBanner(BB.queue.shift());
+}
+
+function bannerHTML(item) {
+  if (item.kind === 'welcome') {
+    const fan = topEarned(window.SodaBadges.getBadges(), 3);
+    return `<div class="bb-art">${badgeFan(fan, 40)}</div>
+      <div class="bb-text">
+        <div class="bb-eyebrow">Welcome back</div>
+        <div class="bb-name">You've already earned ${item.count} badge${item.count === 1 ? '' : 's'}</div>
+        <div class="bb-how">We counted the bottles on your shelf.</div>
+      </div>
+      <div class="bb-actions"><button class="bb-later" data-bb-close>Not now</button><button class="bb-go" data-bb-badges>View badges</button></div>`;
+  }
+  const chev = '<svg class="bb-chev" viewBox="0 0 10 10" width="10" height="10"><path d="m3.2 1.2 3.8 3.8-3.8 3.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  if (item.kind === 'more') {
+    const all = window.SodaBadges.getBadges();
+    const fan = item.ids.slice(0, 3).map(id => all.find(b => b.id === id)).filter(Boolean);
+    return `<div class="bb-art">${badgeFan(fan, 36)}</div>
+      <div class="bb-text">
+        <div class="bb-eyebrow">Badges unlocked</div>
+        <div class="bb-name">+${item.ids.length} more badge${item.ids.length === 1 ? '' : 's'}</div>
+        <div class="bb-how">Tap to see them all</div>
+      </div>${chev}`;
+  }
+  const b = getBadge(item.id);
+  const sparkles = tierRank(b.tier) >= tierRank('rare') ? [0, 1, 2].map(i => `<i class="bb-spark bb-spark--${i}">${sparkle}</i>`).join('') : '';
+  return `<div class="bb-art"><i class="bb-glow"></i><i class="bb-ring"></i>${b.tier === 'mythic' ? '<i class="bb-ring bb-ring--2"></i>' : ''}
+      <span class="bb-pop"><span class="bb-pop-in">${badgeImg(b, 52)}</span></span>${sparkles}</div>
+    <div class="bb-text">
+      <div class="bb-eyebrow">Badge unlocked<i></i><span class="bb-tier">${esc(b.tier)}</span></div>
+      <div class="bb-name">${esc(b.name)}</div>
+      <div class="bb-how">${esc(String(b.how).replace(/\.$/, ''))}</div>
+    </div>
+    ${item.total > 1 ? `<span class="bb-count">${item.i} of ${item.total}</span>` : ''}${chev}`;
+}
+
+const waitingBadges = () => BB.queue.filter(q => q.kind !== 'welcome').length;
+
+// Blank cards behind the front banner, nearest first, at slots from..from+n-1.
+function layoutPeeks(from, n) {
+  while (BB.peeks.length > n) BB.peeks.pop().remove();
+  while (BB.peeks.length < n) {
+    const p = document.createElement('div');
+    p.className = 'bb-peek';
+    p.dataset.slot = from + BB.peeks.length + 1;   // starts one slot further back, then steps in
+    bbLayer.prepend(p);
+    BB.peeks.push(p);
+  }
+  void bbLayer.offsetWidth;
+  BB.peeks.forEach((p, k) => { p.dataset.slot = from + k; });
+}
+
+function showBanner(item) {
+  const b = item.kind === 'badge' ? getBadge(item.id) : null;
+  if (item.kind === 'badge' && !b) { pumpBanners(); return; }
+  const el = document.createElement('div');
+  el.className = `bb bb--${item.kind}${b ? ' tier-' + b.tier : ''}`;
+  if (b) el.dataset.id = b.id;
+  el.setAttribute('role', item.kind === 'welcome' ? 'dialog' : 'button');
+  el.setAttribute('aria-label', item.kind === 'badge' ? `Badge unlocked: ${b.name}` : item.kind === 'more' ? `${item.ids.length} more badges unlocked` : 'Welcome back');
+  el.innerHTML = bannerHTML(item);
+  // the next banner takes the front peek's place instead of dropping in again
+  const front = BB.peeks[0] && BB.peeks[0].dataset.slot === '0' ? BB.peeks.shift() : null;
+  if (front) el.classList.add('is-from-peek');
+  bbLayer.append(el);
+  void el.offsetWidth;
+  el.classList.add('is-in');
+  if (front) front.remove();
+  layoutPeeks(1, item.kind === 'welcome' ? 0 : Math.min(2, waitingBadges()));
+
+  const hold = reducedMotion.matches ? 4000 : item.kind === 'welcome' ? 8000 : b && b.tier === 'mythic' ? 3000 : 2200;
+  // hold starts once the box is in; press or hover pauses it
+  const cur = BB.cur = { el, item, left: hold, at: 0, timer: 0, paused: 0, live: false, out: false };
+  const run = () => { if (cur.out || cur.paused) return; cur.at = performance.now(); cur.timer = setTimeout(() => exitBanner(cur), cur.left); };
+  const pause = () => { if (cur.paused++ || !cur.at) return; clearTimeout(cur.timer); cur.left -= performance.now() - cur.at; cur.at = 0; };
+  const resume = () => { if (!cur.paused || --cur.paused) return; if (cur.live) run(); };
+  setTimeout(() => { cur.live = true; run(); }, reducedMotion.matches ? 240 : 520);
+
+  let y0 = null, flicked = false;
+  el.addEventListener('pointerdown', e => { y0 = e.clientY; pause(); });
+  el.addEventListener('pointermove', e => {
+    if (y0 === null || flicked || e.clientY - y0 > -18) return;
+    flicked = true; exitBanner(cur, true);
+  });
+  const up = () => { if (y0 !== null) { y0 = null; resume(); } };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  if (matchMedia('(hover: hover)').matches) { el.addEventListener('pointerenter', pause); el.addEventListener('pointerleave', resume); }
+  el.addEventListener('click', e => {
+    if (flicked) return;
+    if (e.target.closest('[data-bb-close]')) { exitBanner(cur); return; }
+    if (e.target.closest('[data-bb-badges]') || item.kind === 'more') { exitBanner(cur); if (state.view !== 'badges') go('badges', 'push'); return; }
+    if (item.kind === 'badge') {
+      exitBanner(cur);
+      layoutPeeks(0, 0);
+      BB.sheet = true;     // the queue waits for the sheet, then resumes 400 ms after it closes
+      openBadgeSheet(item.id);
+      new MutationObserver((_, mo) => {
+        if (!sheetLayer.hidden) return;
+        mo.disconnect();
+        BB.sheet = false;
+        BB.gapUntil = Math.max(BB.gapUntil, performance.now() + 400);
+        pumpBanners();
+      }).observe(sheetLayer, { attributes: true, attributeFilter: ['hidden'] });
+    }
+  });
+}
+
+function exitBanner(cur, fast) {
+  if (cur.out) return;
+  cur.out = true;
+  clearTimeout(cur.timer);
+  const el = cur.el;
+  el.classList.add(fast ? 'is-flick' : 'is-out');
+  // the waiting peeks step forward while the front leaves
+  const next = cur.item.kind === 'welcome' || BB.queue[0]?.kind === 'welcome' ? 0 : waitingBadges();
+  layoutPeeks(0, next ? 1 + Math.min(2, next - 1) : 0);
+  const ms = reducedMotion.matches ? 240 : fast ? 240 : 360;
+  afterTransition(el, ms + 200, () => {
+    el.remove();
+    if (BB.cur === cur) BB.cur = null;
+    BB.gapUntil = performance.now() + 160;
+    pumpBanners();
+  });
+}
+
 /* ───────────── toast ───────────── */
 
 let toastTimer = null;
-function toast(msg) {
+function hideToast() {
+  clearTimeout(toastTimer);
+  toastEl.classList.remove('is-show', 'has-action');
+}
+/* action: optional { label, run } shown as a button, e.g. Undo */
+function toast(msg, action) {
   toastEl.textContent = msg;
+  if (action) {
+    const btn = document.createElement('button');
+    btn.className = 'toast-act';
+    btn.textContent = action.label;
+    btn.addEventListener('click', () => { hideToast(); action.run(); });
+    toastEl.append(btn);
+  }
+  toastEl.classList.toggle('has-action', !!action);
   toastEl.classList.add('is-show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toastEl.classList.remove('is-show'), 1900);
+  toastTimer = setTimeout(hideToast, action ? 4000 : 1900);
 }
 
 /* ───────────── global events ───────────── */
@@ -1751,12 +2215,18 @@ document.addEventListener('click', e => {
     const result = toggleFlavor(id);
     if (result === 'full') return;           // 'Three flavors max' already shown; sheet stays open
     if (result === 'removed') { toast('Removed from mix'); addFlavor.textContent = 'Add to mix'; }
-    else { toast(`${flavorById(id).name} added to the mix`); closeSheet(); setTimeout(() => go('mix', 'push'), 240); }
+    else { toast(`${flavorById(id).name} added to the mix`); closeSheet(() => go('mix', 'push')); }
     return;
   }
 
   const flavorRow = t.closest('[data-flavor]');
   if (flavorRow) { openFlavorSheet(flavorRow.dataset.flavor); return; }
+
+  const badgeEl = t.closest('[data-badge]');
+  if (badgeEl) { openBadgeSheet(badgeEl.dataset.badge); return; }
+
+  const badgeBottle = t.closest('[data-badge-bottle]');
+  if (badgeBottle) { closeSheet(() => openBatchSheet(badgeBottle.dataset.badgeBottle)); return; }
 
   const batchEl = t.closest('[data-batch]');
   if (batchEl) { openBatchSheet(batchEl.dataset.batch); return; }
@@ -1777,10 +2247,7 @@ document.addEventListener('click', e => {
 
   const clearCharms = t.closest('[data-clear-charms]');
   if (clearCharms) {
-    state.mix.charms = [];
-    persist();
-    renderDeco();
-    toast('Charms cleared');
+    if (state.mix.charms.length) removeCharms(state.mix.charms.map((c, i) => i), 'Charms cleared');
     return;
   }
 
@@ -1790,8 +2257,7 @@ document.addEventListener('click', e => {
   const mergeThis = t.closest('[data-merge-this]');
   if (mergeThis) {
     const id = mergeThis.dataset.mergeThis;
-    closeSheet();
-    setTimeout(() => openMergeSheet(id), 320);
+    closeSheet(() => openMergeSheet(id));
     return;
   }
 
@@ -1825,8 +2291,8 @@ document.addEventListener('click', e => {
         charms: (b.charms || []).map(c => ({ ...c })),
       });
       persist();
-      closeSheet();
-      setTimeout(() => go('mix', 'push'), 200);
+      badges('evaluateBadges', 'remix', { batch: b });
+      closeSheet(() => go('mix', 'push'));
     }
     return;
   }
@@ -1856,7 +2322,11 @@ document.addEventListener('click', e => {
 
 $('#brewBtn').addEventListener('click', startBrew);
 
+// iOS Safari only shows :active press states once a touchstart listener exists
+document.addEventListener('touchstart', () => {}, { passive: true });
+
 $('#mixReset').addEventListener('click', () => {
+  badges('clearRemixFrom');
   state.mix = defaultMix();
   persist();
   renderMix();
@@ -1871,6 +2341,7 @@ $('#flavorSearch').addEventListener('input', e => {
 // keyboard niceties
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
+  if (state.view === 'badges' && !overlayOpen()) badgesBack();
   if (sheetLayer.classList.contains('is-open')) closeSheet();
   const deco = $('#decoLayer');
   if (deco && deco.classList.contains('is-open')) cancelDeco();
@@ -1901,8 +2372,8 @@ function demoSeed() {
 }
 
 function bootRoute() {
-  const m = location.hash.match(/^#\/(home|shelf|flavors|mix|result)\b/);
-  if (!m) return false;
+  const m = location.hash.match(VIEW_RE);
+  if (!m || (m[1] === 'badges' && !badgesOn())) return false;
   const v = m[1];
 
   if (v === 'result') {
@@ -1931,7 +2402,12 @@ function clock() {
 }
 
 load();
-if (new URLSearchParams(location.search).get('demo')) demoSeed();
+const DEMO = !!new URLSearchParams(location.search).get('demo');
+if (DEMO) demoSeed();
+badges('init', {
+  FLAVORS, BASES, COMBO_NAMES, MAX_CHARMS, isObj, ID_RE, intIn,
+  shelf: () => state.saved, count: () => state.count, demo: DEMO,
+});
 clock();
 setInterval(clock, 15000);
 

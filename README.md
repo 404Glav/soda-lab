@@ -8,11 +8,12 @@ An iOS-flavoured soda-mixing app: pick a base, stack up to three flavors, dress 
 SodaLab/
 ├── index.html     markup for the screens + overlays
 ├── styles.css     the whole design system (tokens, cards, sheets, motion)
+├── badges.js      badge definitions, badge store, evaluator (no UI)
 ├── app.js         flavor data, color blending, bottle renderer, router
 ├── manifest.json  installable / standalone metadata
 ├── sw.js          cache-first offline shell (bump CACHE when files change)
-├── icon.svg
-└── icons/         PNG app icons (180 apple-touch, 192, 512, maskable 512)
+└── icons/         favicons (ico, 16, 32), apple-touch 180, PWA 192/512 + maskable 512;
+                   badges/ holds Pixel's badge caps (<id>.svg, <id>-locked.svg, mystery.svg)
 ```
 
 ## Run it

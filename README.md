@@ -8,6 +8,7 @@ An iOS-flavoured soda-mixing app: pick a base, stack up to three flavors, dress 
 SodaLab/
 ├── index.html     markup for the screens + overlays
 ├── styles.css     the whole design system (tokens, cards, sheets, motion)
+├── badges.js      badge definitions, badge store, evaluator (no UI)
 ├── app.js         flavor data, color blending, bottle renderer, router
 ├── manifest.json  installable / standalone metadata
 ├── sw.js          cache-first offline shell (bump CACHE when files change)

@@ -590,6 +590,9 @@ function syncStage(host, opts) {
 
 const KEY = 'sodalab.v1';
 
+// badges.js (loaded first) owns the badge store; this is the only way app.js talks to it.
+const badges = (fn, ...args) => (window.SodaBadges ? window.SodaBadges[fn](...args) : undefined);
+
 const defaultMix = () => ({ base:'soda', flavors:[], sweet:3, fizz:3, temp:'ice', finish:'none', charms:[] });
 
 /* ───────────── saved-data validation ─────────────
@@ -1160,6 +1163,7 @@ function finishBrew() {
   if (!batch) return;
   state.lastBatch = batch;
   state.pending = null;
+  badges('evaluateBadges', batch.merged ? 'merge' : 'brew', { batch });   // once per brew, never in renderResult
   renderResult(batch, true);
   go('result', 'push');
   persist();
@@ -1256,6 +1260,7 @@ function renderResult(batch, fresh) {
     if (state.saved.some(b => b.id === batch.id)) return;
     state.saved.unshift(batch);
     persist();
+    badges('evaluateBadges', 'save', { batch });
     const btn = $('#saveBtn');
     btn.textContent = 'Saved to shelf';
     btn.disabled = true;
@@ -1266,6 +1271,7 @@ function renderResult(batch, fresh) {
   });
 
   $('#againBtn')?.addEventListener('click', () => {
+    badges('clearRemixFrom');
     state.mix = defaultMix();
     persist();
     renderMix();
@@ -1926,6 +1932,7 @@ document.addEventListener('click', e => {
         charms: (b.charms || []).map(c => ({ ...c })),
       });
       persist();
+      badges('evaluateBadges', 'remix', { batch: b });
       closeSheet(() => go('mix', 'push'));
     }
     return;
@@ -1960,6 +1967,7 @@ $('#brewBtn').addEventListener('click', startBrew);
 document.addEventListener('touchstart', () => {}, { passive: true });
 
 $('#mixReset').addEventListener('click', () => {
+  badges('clearRemixFrom');
   state.mix = defaultMix();
   persist();
   renderMix();
@@ -2034,7 +2042,12 @@ function clock() {
 }
 
 load();
-if (new URLSearchParams(location.search).get('demo')) demoSeed();
+const DEMO = !!new URLSearchParams(location.search).get('demo');
+if (DEMO) demoSeed();
+badges('init', {
+  FLAVORS, BASES, COMBO_NAMES, MAX_CHARMS, isObj, ID_RE, intIn,
+  shelf: () => state.saved, count: () => state.count, demo: DEMO,
+});
 clock();
 setInterval(clock, 15000);
 

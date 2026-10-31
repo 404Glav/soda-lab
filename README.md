@@ -54,7 +54,7 @@ the flavor profile, five profile bars, save-to-shelf, and a copyable recipe.
 for details, remix it, merge it with another, or remove it.
 
 **Merge** — fuse any two shelf bottles into a third. Flavors, sweetness, fizz,
-finish and charms combine (three flavors, four charms max). The originals stay.
+finish and charms combine (three flavors, six charms max). The originals stay.
 Merged batches roll with better rarity odds.
 
 **Flavors** — the pantry: searchable, each with notes, a description, and a

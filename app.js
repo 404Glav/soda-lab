@@ -139,6 +139,8 @@ const CHARMS = [
   { id:'planet', name:'Planet',  art:'<circle cx="12" cy="11.6" r="6.4" fill="#6E93D8"/><circle cx="10" cy="9.4" r="2.2" fill="#A8C2F2" opacity=".8"/><ellipse cx="12" cy="12.4" rx="10.2" ry="2.6" fill="none" stroke="#E9C77A" stroke-width="1.4" transform="rotate(-18 12 12.4)"/>' },
 ];
 
+const MAX_CHARMS = 6;   // one limit for placing, merging, rarity luck and score
+
 const charmById = id => CHARMS.find(c => c.id === id);
 const finishById = id => FINISHES.find(f => f.id === id) || FINISHES[0];
 const rarityById = id => RARITY.find(r => r.id === id) || RARITY[0];
@@ -568,7 +570,7 @@ function luckOf(b) {
   let l = 0;
   l += Math.min((b.flavors || []).length, 3) * .07;
   if (b.finish && b.finish !== 'none') l += finishById(b.finish).luck;
-  l += Math.min((b.charms || []).length, 4) * .045;
+  l += Math.min((b.charms || []).length, MAX_CHARMS) * .045;
   if (b.merged) l += .18;
   if ((b.flavors || []).length === 3) l += .03;
   return clamp(l, 0, .8);
@@ -604,7 +606,7 @@ function scoreOf(b) {
   const harmony = clamp(1 - spread * 1.25, 0, 1);
   const complexity = clamp((b.flavors || []).length / 3, 0, 1);
   const rare = rarityById(b.rarity);
-  const bonus = (rare.stars - 1) * 3.2 + (b.finish && b.finish !== 'none' ? 3 : 0) + Math.min((b.charms || []).length, 4) * 1.5;
+  const bonus = (rare.stars - 1) * 3.2 + (b.finish && b.finish !== 'none' ? 3 : 0) + Math.min((b.charms || []).length, MAX_CHARMS) * 1.5;
   return Math.round(clamp(48 + harmony * 20 + complexity * 12 + bonus, 40, 99));
 }
 
@@ -1255,7 +1257,7 @@ function mergeFinish(a, b) {
 function mergeCharms(a, b) {
   const out = [], seen = new Set();
   [...(a.charms || []), ...(b.charms || [])].forEach(c => {
-    if (out.length >= 4 || seen.has(c.id) || !charmById(c.id)) return;
+    if (out.length >= MAX_CHARMS || seen.has(c.id) || !charmById(c.id)) return;
     seen.add(c.id);
     out.push({ ...c });
   });
@@ -1477,7 +1479,7 @@ function renderDeco() {
 
 function placeCharm(rect, cx, cy) {
   const mix = state.mix;
-  if (mix.charms.length >= 6) { toast('Six charms max'); return; }
+  if (mix.charms.length >= MAX_CHARMS) { toast(`${MAX_CHARMS} charms max`); return; }
   const def = charmById(state.charmSel) || CHARMS[0];
   const x = clamp((cx - rect.left) / rect.width * 100, 6, 94);
   const y = clamp((cy - rect.top) / rect.height * 100, 6, 94);

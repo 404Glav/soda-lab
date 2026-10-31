@@ -794,7 +794,7 @@ window.addEventListener('popstate', e => {
   const overlay = overlayOpen();
   if (overlay) {
     if (overlay === 'sheet') closeSheet();
-    if (overlay === 'deco') closeDeco();
+    if (overlay === 'deco') cancelDeco();
     history.pushState(navState, '', location.pathname + location.search + '#/' + navState.v);
     return;
   }
@@ -1574,9 +1574,12 @@ function swatchFor(fin) {
     : `linear-gradient(140deg, ${fin.swatch}, ${lighten(fin.swatch, .45)})`;
 }
 
+let decoSnapshot = null;   // { finish, charms } when Decorate opened; Cancel restores it
+
 function openDeco() {
   const layer = $('#decoLayer');
   if (!layer) return;
+  decoSnapshot = { finish: state.mix.finish, charms: state.mix.charms.map(c => ({ ...c })) };
   layer.hidden = false;
   void layer.offsetWidth;
   layer.classList.add('is-open');
@@ -1587,10 +1590,19 @@ function closeDeco() {
   const layer = $('#decoLayer');
   if (!layer) return;
   layer.classList.remove('is-open');
+  decoSnapshot = null;
   setTimeout(() => { layer.hidden = true; }, 380);
   persist();
   renderMix();
   renderHome();
+}
+
+function cancelDeco() {
+  if (decoSnapshot) {
+    state.mix.finish = decoSnapshot.finish;
+    state.mix.charms = decoSnapshot.charms;
+  }
+  closeDeco();
 }
 
 function renderDeco() {
@@ -1752,6 +1764,8 @@ document.addEventListener('click', e => {
   const decoBtn = t.closest('[data-open-deco]');
   if (decoBtn) { openDeco(); return; }
 
+  if (t.closest('[data-cancel-deco]')) { cancelDeco(); return; }
+
   const closeDecoBtn = t.closest('[data-close-deco]');
   if (closeDecoBtn) { closeDeco(); return; }
 
@@ -1859,7 +1873,7 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (sheetLayer.classList.contains('is-open')) closeSheet();
   const deco = $('#decoLayer');
-  if (deco && deco.classList.contains('is-open')) closeDeco();
+  if (deco && deco.classList.contains('is-open')) cancelDeco();
 });
 
 /* ───────────── boot ───────────── */

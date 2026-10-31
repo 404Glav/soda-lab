@@ -943,14 +943,17 @@ function syncDial(kind) {
   label.style.color = v > 0 ? darken(color, .15) : 'var(--ink-3)';
 }
 
+/* Returns 'added' | 'removed' | 'full' (nothing changed; the toast says why). */
 function toggleFlavor(id) {
   const mix = state.mix;
   const i = mix.flavors.indexOf(id);
-  if (i >= 0) mix.flavors.splice(i, 1);
-  else if (mix.flavors.length < 3) mix.flavors.push(id);
-  else { toast('Three flavors max'); return; }
+  let result;
+  if (i >= 0) { mix.flavors.splice(i, 1); result = 'removed'; }
+  else if (mix.flavors.length < 3) { mix.flavors.push(id); result = 'added'; }
+  else { toast('Three flavors max'); return 'full'; }
   persist();
   renderMix();
+  return result;
 }
 
 /* ───────────── brewing ───────────── */
@@ -1616,10 +1619,9 @@ document.addEventListener('click', e => {
   const sheetToggle = t.closest('[data-sheet-toggle]');
   if (sheetToggle) {
     const id = sheetToggle.dataset.sheetToggle;
-    const was = state.mix.flavors.includes(id);
-    toggleFlavor(id);
+    const result = toggleFlavor(id);
     refreshSheetToggles();
-    if (!was && state.mix.flavors.includes(id)) toast(`${flavorById(id).name} added`);
+    if (result === 'added') toast(`${flavorById(id).name} added`);
     return;
   }
 
@@ -1629,9 +1631,9 @@ document.addEventListener('click', e => {
   const addFlavor = t.closest('[data-add-flavor]');
   if (addFlavor) {
     const id = addFlavor.dataset.addFlavor;
-    const was = state.mix.flavors.includes(id);
-    toggleFlavor(id);
-    if (was) toast('Removed from mix');
+    const result = toggleFlavor(id);
+    if (result === 'full') return;           // 'Three flavors max' already shown; sheet stays open
+    if (result === 'removed') { toast('Removed from mix'); addFlavor.textContent = 'Add to mix'; }
     else { toast(`${flavorById(id).name} added to the mix`); closeSheet(); setTimeout(() => go('mix', 'push'), 240); }
     return;
   }

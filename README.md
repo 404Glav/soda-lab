@@ -10,7 +10,9 @@ SodaLab/
 ├── styles.css     the whole design system (tokens, cards, sheets, motion)
 ├── app.js         flavor data, color blending, bottle renderer, router
 ├── manifest.json  installable / standalone metadata
-└── icon.svg
+├── sw.js          cache-first offline shell (bump CACHE when files change)
+├── icon.svg
+└── icons/         PNG app icons (180 apple-touch, 192, 512, maskable 512)
 ```
 
 ## Run it
@@ -54,7 +56,7 @@ the flavor profile, five profile bars, save-to-shelf, and a copyable recipe.
 for details, remix it, merge it with another, or remove it.
 
 **Merge** — fuse any two shelf bottles into a third. Flavors, sweetness, fizz,
-finish and charms combine (three flavors, four charms max). The originals stay.
+finish and charms combine (three flavors, six charms max). The originals stay.
 Merged batches roll with better rarity odds.
 
 **Flavors** — the pantry: searchable, each with notes, a description, and a

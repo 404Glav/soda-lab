@@ -63,7 +63,7 @@ const SUFFIXES = ['Fizz','Spritz','Spark','Haze','Bloom','Noir','Crush','Drift',
 const COMBOS = {
   'cherry+cola':'Cherry Cola',
   'lemon+lime':'Citrus Split',
-  'grape+cream':'Grape Float',
+  'cream+grape':'Grape Float',
   'cream+rootbeer':'Root Beer Float',
   'cola+orange':'Orange Cola',
   'ginger+lime':'Ginger Lime',
@@ -75,28 +75,32 @@ const COMBOS = {
   'ginger+peach':'Peach Ginger',
   'lemon+rose':'Rose Lemonade',
   'berry+lime':'Wild Lime',
-  'cola+coffee':'Cola Noir',
+  'coffee+cola':'Cola Noir',
   'blueberry+lemon':'Blue Spark',
-  'raspberry+cream':'Raspberry Cream',
-  'mango+lime':'Mango Lime',
-  'passion+orange':'Passion Sun',
+  'cream+raspberry':'Raspberry Cream',
+  'lime+mango':'Mango Lime',
+  'orange+passion':'Passion Sun',
   'coconut+pineapple':'Island Fizz',
-  'vanilla+cherry':'Cherry Vanilla',
+  'cherry+vanilla':'Cherry Vanilla',
   'caramel+cola':'Salted Cola',
-  'hazelnut+coffee':'Hazel Brew',
-  'cinnamon+apple':'Spiced Orchard',
+  'coffee+hazelnut':'Hazel Brew',
+  'cinnamon+pear':'Spiced Orchard',
   'lavender+lemon':'Lavender Lemonade',
   'hibiscus+lime':'Hibiscus Lime',
-  'yuzu+ginger':'Yuzu Ginger',
+  'ginger+yuzu':'Yuzu Ginger',
   'bloodorange+cola':'Blood Orange Cola',
-  'pear+ginger':'Pear Ginger',
+  'ginger+pear':'Pear Ginger',
   'plum+vanilla':'Plum Velvet',
   'cardamom+cream':'Cardamom Cream',
-  'saltedlemon+mint':'Salted Mint',
-  'watermelon+mint':'Melon Cooler',
+  'mint+saltedlemon':'Salted Mint',
+  'mint+watermelon':'Melon Cooler',
   'anise+coffee':'Black Licorice Brew',
   'clove+orange':'Clove Orange',
 };
+
+// Keys are two flavor ids; lookups sort them, so write them in either order.
+const COMBO_NAMES = Object.fromEntries(
+  Object.entries(COMBOS).map(([k, v]) => [k.split('+').sort().join('+'), v]));
 
 const SWEET_WORDS = ['Bone dry','Barely sweet','Light','Balanced','Sweet','Candy'];
 const FIZZ_WORDS  = ['Still','Soft','Gentle','Crisp','Lively','Volcanic'];
@@ -138,6 +142,8 @@ const CHARMS = [
   { id:'pearl',  name:'Pearl',   art:'<circle cx="12" cy="12" r="8" fill="#F3EEF8"/><circle cx="12" cy="12" r="8" fill="none" stroke="#C9C2D6" stroke-width=".7"/><ellipse cx="9.2" cy="8.8" rx="2.8" ry="1.9" fill="#FFF" opacity=".8"/><ellipse cx="14.6" cy="15.2" rx="2" ry="1.2" fill="#E7D8F2" opacity=".7"/>' },
   { id:'planet', name:'Planet',  art:'<circle cx="12" cy="11.6" r="6.4" fill="#6E93D8"/><circle cx="10" cy="9.4" r="2.2" fill="#A8C2F2" opacity=".8"/><ellipse cx="12" cy="12.4" rx="10.2" ry="2.6" fill="none" stroke="#E9C77A" stroke-width="1.4" transform="rotate(-18 12 12.4)"/>' },
 ];
+
+const MAX_CHARMS = 6;   // one limit for placing, merging, rarity luck and score
 
 const charmById = id => CHARMS.find(c => c.id === id);
 const finishById = id => FINISHES.find(f => f.id === id) || FINISHES[0];
@@ -267,7 +273,7 @@ function makeName(mix) {
 
   if (fs.length >= 2) {
     const key = [fs[0].id, fs[1].id].sort().join('+');
-    if (COMBOS[key]) return COMBOS[key];
+    if (COMBO_NAMES[key]) return COMBO_NAMES[key];
   }
 
   const h = hashStr(mix.flavors.join('') + mix.base + mix.sweet + mix.fizz);
@@ -556,19 +562,73 @@ const KEY = 'sodalab.v1';
 
 const defaultMix = () => ({ base:'soda', flavors:[], sweet:3, fizz:3, temp:'ice', finish:'none', charms:[] });
 
-function normalizeMix(m) {
-  const mix = Object.assign(defaultMix(), m || {});
-  if (!Array.isArray(mix.flavors)) mix.flavors = [];
-  if (!Array.isArray(mix.charms)) mix.charms = [];
-  if (!FINISHES.some(f => f.id === mix.finish)) mix.finish = 'none';
-  return mix;
+/* ───────────── saved-data validation ─────────────
+   Everything read from localStorage goes through sanitizeMix / sanitizeBatch,
+   so render code can trust ids, numbers and colors. Free text (names) is
+   escaped with esc() wherever it is put into HTML. */
+
+const ID_RE  = /^[A-Za-z0-9_-]{1,64}$/;
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+const ESC_MAP = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' };
+const esc = s => String(s).replace(/[&<>"']/g, c => ESC_MAP[c]);
+const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+const intIn = (v, a, b, d) => (Number.isInteger(v) && v >= a && v <= b ? v : d);
+const numIn = (v, a, b, d) => (typeof v === 'number' && Number.isFinite(v) ? clamp(v, a, b) : d);
+
+function sanitizeCharms(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter(c => isObj(c) && charmById(c.id))
+    .slice(0, MAX_CHARMS)
+    .map(c => ({ id: c.id, x: numIn(c.x, 0, 100, 50), y: numIn(c.y, 0, 100, 50), rot: numIn(c.rot, -45, 45, 0) }));
+}
+
+function sanitizeMix(m) {
+  const d = defaultMix();
+  if (!isObj(m)) return d;
+  const flavors = Array.isArray(m.flavors)
+    ? m.flavors.filter((id, i, a) => typeof id === 'string' && flavorById(id) && a.indexOf(id) === i).slice(0, 3)
+    : [];
+  return {
+    base:    BASES.some(b => b.id === m.base) ? m.base : d.base,
+    flavors,
+    sweet:   intIn(m.sweet, 0, 5, d.sweet),
+    fizz:    intIn(m.fizz, 0, 5, d.fizz),
+    temp:    TEMPS.some(t => t.id === m.temp) ? m.temp : d.temp,
+    finish:  FINISHES.some(f => f.id === m.finish) ? m.finish : d.finish,
+    charms:  sanitizeCharms(m.charms),
+  };
+}
+
+/* Returns a clean batch, or null if the entry is unusable. Missing rarity and
+   rating are filled in (older saves), exactly as before. */
+function sanitizeBatch(b) {
+  if (!isObj(b)) return null;
+  const mix = sanitizeMix(b);
+  const id = typeof b.id === 'string' && ID_RE.test(b.id) ? b.id : 'r' + hashStr(JSON.stringify(b)).toString(36);
+  const name = typeof b.name === 'string' && b.name.trim() ? b.name.trim().slice(0, 80) : makeName(mix);
+  const out = Object.assign({
+    id,
+    num:   intIn(b.num, 0, 1e9, 0),
+    name,
+  }, mix, {
+    color: typeof b.color === 'string' && HEX_RE.test(b.color) ? b.color : blendColor(mix),
+    date:  numIn(b.date, 0, 8.64e15, Date.now()),
+  });
+  if (b.merged === true) {
+    out.merged = true;
+    out.lineage = Array.isArray(b.lineage) ? b.lineage.filter(x => typeof x === 'string' && ID_RE.test(x)).slice(0, 2) : [];
+  }
+  out.rarity = RARITY.some(r => r.id === b.rarity) ? b.rarity : rollRarity(out.id, luckOf(out)).id;
+  out.rating = typeof b.rating === 'number' && Number.isFinite(b.rating) ? Math.round(clamp(b.rating, 0, 100)) : scoreOf(out);
+  return out;
 }
 
 function luckOf(b) {
   let l = 0;
   l += Math.min((b.flavors || []).length, 3) * .07;
   if (b.finish && b.finish !== 'none') l += finishById(b.finish).luck;
-  l += Math.min((b.charms || []).length, 4) * .045;
+  l += Math.min((b.charms || []).length, MAX_CHARMS) * .045;
   if (b.merged) l += .18;
   if ((b.flavors || []).length === 3) l += .03;
   return clamp(l, 0, .8);
@@ -604,18 +664,8 @@ function scoreOf(b) {
   const harmony = clamp(1 - spread * 1.25, 0, 1);
   const complexity = clamp((b.flavors || []).length / 3, 0, 1);
   const rare = rarityById(b.rarity);
-  const bonus = (rare.stars - 1) * 3.2 + (b.finish && b.finish !== 'none' ? 3 : 0) + Math.min((b.charms || []).length, 4) * 1.5;
+  const bonus = (rare.stars - 1) * 3.2 + (b.finish && b.finish !== 'none' ? 3 : 0) + Math.min((b.charms || []).length, MAX_CHARMS) * 1.5;
   return Math.round(clamp(48 + harmony * 20 + complexity * 12 + bonus, 40, 99));
-}
-
-function normalizeBatch(b) {
-  if (!b || typeof b !== 'object') return b;
-  if (!b.finish) b.finish = 'none';
-  if (!Array.isArray(b.charms)) b.charms = [];
-  if (!Array.isArray(b.flavors)) b.flavors = [];
-  if (!b.rarity) b.rarity = rollRarity(b.id || b.name || 'seed', luckOf(b)).id;
-  if (typeof b.rating !== 'number') b.rating = scoreOf(b);
-  return b;
 }
 
 const state = {
@@ -633,9 +683,13 @@ function load() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return;
     const d = JSON.parse(raw);
-    if (Array.isArray(d.saved)) state.saved = d.saved.map(normalizeBatch);
-    if (typeof d.count === 'number') state.count = d.count;
-    if (d.mix) state.mix = normalizeMix(d.mix);
+    if (!isObj(d)) return;
+    if (Array.isArray(d.saved)) {
+      const seen = new Set();
+      state.saved = d.saved.map(sanitizeBatch).filter(b => b && !seen.has(b.id) && seen.add(b.id));
+    }
+    state.count = Math.max(intIn(d.count, 0, 1e9, 0), 0, ...state.saved.map(b => b.num));
+    if (d.mix) state.mix = sanitizeMix(d.mix);
   } catch (e) { /* storage unavailable — carry on */ }
 }
 function persist() {
@@ -663,10 +717,34 @@ const TAB_VIEWS = ['home', 'shelf', 'flavors'];
 
 /* ───────────── router ───────────── */
 
-function go(name, dir = 'push') {
+/* History: every screen change writes #/<view> and a state of
+   { v: view, depth: entries pushed since boot, root: view at depth 0 }.
+   Tab-to-tab moves (except leaving the Lab) replace instead of push, so the
+   phone's back button walks back through screens, not every tab tap. */
+const VIEW_RE = /^#\/(home|shelf|flavors|mix|result)\b/;
+const viewFromHash = () => (location.hash.match(VIEW_RE) || [])[1] || null;
+let navState = { v: 'home', depth: 0, root: 'home' };
+
+function writeHistory(name, mode) {
+  if (mode === 'none') return;
+  navState = mode === 'push'
+    ? { v: name, depth: navState.depth + 1, root: navState.root }
+    : { v: name, depth: navState.depth, root: navState.depth ? navState.root : name };
+  const url = location.pathname + location.search + '#/' + name;
+  if (mode === 'push') history.pushState(navState, '', url);
+  else history.replaceState(navState, '', url);
+}
+
+function historyModeFor(from, to) {
+  return TAB_VIEWS.includes(from) && TAB_VIEWS.includes(to) && from !== 'home' ? 'replace' : 'push';
+}
+
+/* go(name, dir = 'push' | 'pop' | 'fade', { history: 'push' | 'replace' | 'none' }) */
+function go(name, dir = 'push', opts = {}) {
   const next = document.querySelector(`.view[data-view="${name}"]`);
   const cur  = document.querySelector('.view.is-active');
   if (!next || next === cur) return;
+  writeHistory(name, opts.history || historyModeFor(state.view, name));
 
   const enterCls = dir === 'fade' ? 'enter-fade' : dir === 'pop' ? 'enter-left' : 'enter-right';
   next.classList.add(enterCls);
@@ -693,7 +771,42 @@ function updateTabs(name = state.view) {
   $$('.tab').forEach(t => t.classList.toggle('is-active', t.dataset.go === name));
 }
 
-function back() { go('home', 'pop'); }
+/* In-app back (and the Lab tab) returns to the lab. If the lab is the root of
+   our history, unwind to it so the phone's back button doesn't land on the
+   screens we just left; otherwise replace the current entry. */
+function back(dir = 'pop') {
+  if (state.view === 'home') return;
+  if (navState.depth > 0 && navState.root === 'home') history.go(-navState.depth);
+  else go('home', dir, { history: 'replace' });
+}
+
+function overlayOpen() {
+  const deco = $('#decoLayer');
+  if (sheetLayer.classList.contains('is-open')) return 'sheet';
+  if (deco && deco.classList.contains('is-open')) return 'deco';
+  if (brewLayer.classList.contains('is-open')) return 'brew';
+  return null;
+}
+
+window.addEventListener('popstate', e => {
+  // Back with a sheet or Decorate open closes it and keeps the screen: put the
+  // entry we just left back on the stack. Back during a brew is ignored.
+  const overlay = overlayOpen();
+  if (overlay) {
+    if (overlay === 'sheet') closeSheet();
+    if (overlay === 'deco') cancelDeco();
+    history.pushState(navState, '', location.pathname + location.search + '#/' + navState.v);
+    return;
+  }
+  let v = (e.state && e.state.v) || viewFromHash() || 'home';
+  if (v === 'result' && !$('#resultBody').children.length) v = 'home';
+  const forward = !!(e.state && e.state.depth > navState.depth);
+  navState = e.state && typeof e.state.depth === 'number'
+    ? e.state
+    : { v, depth: navState.depth, root: navState.root };
+  const tabs = TAB_VIEWS.includes(state.view) && TAB_VIEWS.includes(v);
+  go(v, tabs ? 'fade' : forward ? 'push' : 'pop', { history: 'none' });
+});
 
 document.addEventListener('click', e => {
   const goEl = e.target.closest('[data-go]');
@@ -702,6 +815,8 @@ document.addEventListener('click', e => {
     const target = goEl.dataset.go;
     if (target === 'mix' && state.view !== 'mix') {
       go('mix', 'push');
+    } else if (target === 'home') {
+      back(TAB_VIEWS.includes(state.view) ? 'fade' : 'pop');
     } else if (TAB_VIEWS.includes(target)) {
       go(target, TAB_VIEWS.includes(state.view) ? 'fade' : 'pop');
     } else {
@@ -752,11 +867,11 @@ function renderHome() {
     </button>`;
   } else {
     row.innerHTML = state.saved.slice(0, 6).map(b => `
-      <button class="mini-card" data-batch="${b.id}">
+      <button class="mini-card" data-batch="${esc(b.id)}">
         <div class="mini-art" style="background:linear-gradient(160deg, ${lighten(b.color,.86)}, ${lighten(b.color,.94)})">
           ${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 999, finish:b.finish, charms:b.charms, still:true })}
         </div>
-        <div class="mini-name">${b.name}</div>
+        <div class="mini-name">${esc(b.name)}</div>
         <div class="mini-meta">${dateLabel(b.date)} · ${rarityById(b.rarity).name}</div>
       </button>`).join('');
   }
@@ -790,24 +905,37 @@ function dateLabel(ts) {
 
 /* ───────────── mix ───────────── */
 
+/* Everything the mixer shows that is derived from the mix itself. */
+function deriveMix(mix) {
+  const fs = mix.flavors.map(flavorById).filter(Boolean);
+  return {
+    color: blendColor(mix),
+    name:  makeName(mix),
+    sub:   fs.length
+      ? `${baseById(mix.base).name} · ${fs.map(f => f.name).join(', ')}`
+      : `${baseById(mix.base).name} · no flavors yet`,
+    flavors: fs,
+    fill:  fs.length ? .82 : .62,
+  };
+}
+
 function renderMix() {
   const mix = state.mix;
-  const color = blendColor(mix);
-  const fs = mix.flavors.map(flavorById).filter(Boolean);
+  const derived = deriveMix(mix);
+  const color = derived.color;
+  const fs = derived.flavors;
 
   $('#mixWash').style.background = `
     radial-gradient(52% 48% at 50% 40%, ${rgba(color, .34)} 0%, ${rgba(color, .10)} 52%, transparent 74%),
     radial-gradient(40% 42% at 24% 62%, ${rgba(lighten(color,.3), .30)} 0%, transparent 70%)`;
 
   $('#mixBottle').innerHTML = bottleStage({
-    color, fill: fs.length ? .82 : .62, fizz: mix.fizz, seed: 21,
+    color, fill: derived.fill, fizz: mix.fizz, seed: 21,
     finish: mix.finish, charms: mix.charms,
   });
 
-  $('#mixName').textContent = makeName(mix);
-  $('#mixSub').textContent = fs.length
-    ? `${baseById(mix.base).name} · ${fs.map(f => f.name).join(', ')}`
-    : `${baseById(mix.base).name} · no flavors yet`;
+  $('#mixName').textContent = derived.name;
+  $('#mixSub').textContent = derived.sub;
 
   // base options
   $('#baseRow').innerHTML = BASES.map(b => `
@@ -893,14 +1021,17 @@ function syncDial(kind) {
   label.style.color = v > 0 ? darken(color, .15) : 'var(--ink-3)';
 }
 
+/* Returns 'added' | 'removed' | 'full' (nothing changed; the toast says why). */
 function toggleFlavor(id) {
   const mix = state.mix;
   const i = mix.flavors.indexOf(id);
-  if (i >= 0) mix.flavors.splice(i, 1);
-  else if (mix.flavors.length < 3) mix.flavors.push(id);
-  else { toast('Three flavors max'); return; }
+  let result;
+  if (i >= 0) { mix.flavors.splice(i, 1); result = 'removed'; }
+  else if (mix.flavors.length < 3) { mix.flavors.push(id); result = 'added'; }
+  else { toast('Three flavors max'); return 'full'; }
   persist();
   renderMix();
+  return result;
 }
 
 /* ───────────── brewing ───────────── */
@@ -1018,7 +1149,7 @@ function renderResult(batch, fresh) {
         <svg viewBox="0 0 24 24" width="22" height="22"><path d="M14.5 5 8 12l6.5 7" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <span style="font-size:11.5px;font-weight:650;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)">Batch ${String(batch.num).padStart(3,'0')}</span>
-      <button class="icon-btn" id="shareBtn" aria-label="Copy recipe">
+      <button class="icon-btn" id="shareBtn" aria-label="Share recipe">
         <svg viewBox="0 0 24 24" width="19" height="19"><path d="M12 3v11m0-11 4 4m-4-4-4 4M5 14v4.4c0 1 .8 1.6 1.7 1.6h10.6c1 0 1.7-.6 1.7-1.6V14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     </div>
@@ -1028,7 +1159,7 @@ function renderResult(batch, fresh) {
         radial-gradient(46% 42% at 50% 42%, ${rgba(color,.30)} 0%, ${rgba(color,.08)} 55%, transparent 76%)"></div>
       <div class="result-bottle">${bottleStage({ color, fill:.84, fizz:batch.fizz, seed:11, finish:batch.finish, charms:batch.charms })}</div>
       <div class="result-eyebrow">${fresh ? 'Freshly brewed' : 'From your shelf'}</div>
-      <h1 class="result-name">${batch.name}</h1>
+      <h1 class="result-name">${esc(batch.name)}</h1>
       <div class="result-sub">${baseById(batch.base).name} · ${batch.flavors.length ? batch.flavors.map(fname).join(', ') : 'No flavors'}</div>
       <div class="rarity-badge" style="--rc:${rarity.color}" title="Rolled at brew time">
         <span class="rarity-stars">${'★'.repeat(rarity.stars)}<span class="rarity-dim">${'★'.repeat(6 - rarity.stars)}</span></span>
@@ -1094,9 +1225,36 @@ function renderResult(batch, fresh) {
     const fin = finishById(batch.finish);
     const rarity = rarityById(batch.rarity);
     const txt = `${batch.name} — Soda Lab\n${baseById(batch.base).name}, ${batch.flavors.map(fname).join(', ')}\n${rarity.name} · ${batch.rating}/100 · Sweetness ${batch.sweet}/5 · Fizz ${batch.fizz}/5 · ${(TEMPS.find(t => t.id === batch.temp) || TEMPS[0]).label}${fin.id !== 'none' ? ` · ${fin.name} finish` : ''}`;
-    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(txt).then(() => toast('Recipe copied'), () => toast('Could not copy'));
-    else toast('Recipe copied');
+    shareText(txt, batch.name).then(result => {
+      if (result === 'copied') toast('Recipe copied');
+      else if (result === 'failed') toast('Could not copy');
+      // 'shared' / 'cancelled': the system share sheet was the feedback
+    });
   });
+}
+
+/* Share sheet first (phones), then the async clipboard, then the legacy copy
+   path (works on plain http). Resolves 'shared' | 'cancelled' | 'copied' | 'failed'. */
+async function shareText(text, title) {
+  if (typeof navigator.share === 'function') {
+    try { await navigator.share({ title, text }); return 'shared'; }
+    catch (e) { if (e && e.name === 'AbortError') return 'cancelled'; }
+  }
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    try { await navigator.clipboard.writeText(text); return 'copied'; } catch (e) { /* fall through */ }
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    if (ok) return 'copied';
+  } catch (e) { /* fall through */ }
+  return 'failed';
 }
 
 /* ───────────── shelf ───────────── */
@@ -1122,12 +1280,12 @@ function renderShelf() {
   grid.innerHTML = state.saved.map(b => {
     const r = rarityById(b.rarity);
     return `
-    <button class="batch-card" data-batch="${b.id}">
+    <button class="batch-card" data-batch="${esc(b.id)}">
       <div class="batch-art" style="background:linear-gradient(155deg, ${lighten(b.color,.84)} 0%, ${lighten(b.color,.93)} 100%)">
         ${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 997, finish:b.finish, charms:b.charms, still:true })}
         <span class="rarity-chip" style="--rc:${r.color}">${r.name}</span>
       </div>
-      <div class="batch-name">${b.name}</div>
+      <div class="batch-name">${esc(b.name)}</div>
       <div class="batch-meta">${dateLabel(b.date)} · ${b.rating}/100</div>
     </button>`;
   }).join('');
@@ -1203,7 +1361,6 @@ function openFlavorSheet(id) {
 function openBatchSheet(id) {
   const b = state.saved.find(x => x.id === id);
   if (!b) return;
-  normalizeBatch(b);
   const r = rarityById(b.rarity);
   const fin = finishById(b.finish);
   const rows = [
@@ -1223,13 +1380,13 @@ function openBatchSheet(id) {
       <div style="width:48px">${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 997, finish:b.finish, charms:b.charms })}</div>
       <span class="sheet-rarity" style="--rc:${r.color}">${'★'.repeat(r.stars)} ${r.name}</span>
     </div>
-    <h2 class="sheet-title">${b.name}</h2>
+    <h2 class="sheet-title">${esc(b.name)}</h2>
     <div class="sheet-note">Batch ${String(b.num).padStart(3,'0')} · ${b.rating}/100</div>
     <div class="sheet-list">${rows}</div>
     <div class="sheet-actions">
-      <button class="btn-primary" data-remix="${b.id}">Mix this again</button>
-      <button class="btn-ghost" data-merge-this="${b.id}">Merge with another</button>
-      <button class="danger-btn" data-remove-batch="${b.id}">Remove from shelf</button>
+      <button class="btn-primary" data-remix="${esc(b.id)}">Mix this again</button>
+      <button class="btn-ghost" data-merge-this="${esc(b.id)}">Merge with another</button>
+      <button class="danger-btn" data-remove-batch="${esc(b.id)}">Remove from shelf</button>
     </div>`);
 }
 
@@ -1255,7 +1412,7 @@ function mergeFinish(a, b) {
 function mergeCharms(a, b) {
   const out = [], seen = new Set();
   [...(a.charms || []), ...(b.charms || [])].forEach(c => {
-    if (out.length >= 4 || seen.has(c.id) || !charmById(c.id)) return;
+    if (out.length >= MAX_CHARMS || seen.has(c.id) || !charmById(c.id)) return;
     seen.add(c.id);
     out.push({ ...c });
   });
@@ -1306,12 +1463,12 @@ function mergeCandidates() {
 
 function mergeRow(b, on) {
   const r = rarityById(b.rarity);
-  return `<button class="merge-row ${on ? 'is-on' : ''}" data-merge-pick="${b.id}">
+  return `<button class="merge-row ${on ? 'is-on' : ''}" data-merge-pick="${esc(b.id)}">
     <span class="merge-art" style="background:linear-gradient(155deg, ${lighten(b.color,.86)}, ${lighten(b.color,.94)})">
       ${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 997, finish:b.finish, still:true })}
     </span>
     <span class="merge-copy">
-      <span class="mr-name">${b.name}</span>
+      <span class="mr-name">${esc(b.name)}</span>
       <span class="mr-meta"><i class="rc-dot" style="background:${r.color}"></i>${r.name} · ${b.rating}/100</span>
     </span>
     <span class="merge-check">${on ? '✓' : ''}</span>
@@ -1328,7 +1485,7 @@ function mergePreviewMarkup(a, b) {
     </div>
     <div class="merge-preview-copy">
       <div class="mp-kicker">The blend</div>
-      <div class="mp-name">${mergeName(a, b)}</div>
+      <div class="mp-name">${esc(mergeName(a, b))}</div>
       <div class="mp-sub">${mix.flavors.length ? mix.flavors.map(fname).join(' · ') : 'No flavors'} · ${fin.name}</div>
       <div class="mp-bonus">Merged batches roll with better rarity odds.</div>
     </div>
@@ -1417,9 +1574,12 @@ function swatchFor(fin) {
     : `linear-gradient(140deg, ${fin.swatch}, ${lighten(fin.swatch, .45)})`;
 }
 
+let decoSnapshot = null;   // { finish, charms } when Decorate opened; Cancel restores it
+
 function openDeco() {
   const layer = $('#decoLayer');
   if (!layer) return;
+  decoSnapshot = { finish: state.mix.finish, charms: state.mix.charms.map(c => ({ ...c })) };
   layer.hidden = false;
   void layer.offsetWidth;
   layer.classList.add('is-open');
@@ -1430,10 +1590,19 @@ function closeDeco() {
   const layer = $('#decoLayer');
   if (!layer) return;
   layer.classList.remove('is-open');
+  decoSnapshot = null;
   setTimeout(() => { layer.hidden = true; }, 380);
   persist();
   renderMix();
   renderHome();
+}
+
+function cancelDeco() {
+  if (decoSnapshot) {
+    state.mix.finish = decoSnapshot.finish;
+    state.mix.charms = decoSnapshot.charms;
+  }
+  closeDeco();
 }
 
 function renderDeco() {
@@ -1477,7 +1646,7 @@ function renderDeco() {
 
 function placeCharm(rect, cx, cy) {
   const mix = state.mix;
-  if (mix.charms.length >= 6) { toast('Six charms max'); return; }
+  if (mix.charms.length >= MAX_CHARMS) { toast(`${MAX_CHARMS} charms max`); return; }
   const def = charmById(state.charmSel) || CHARMS[0];
   const x = clamp((cx - rect.left) / rect.width * 100, 6, 94);
   const y = clamp((cy - rect.top) / rect.height * 100, 6, 94);
@@ -1567,10 +1736,9 @@ document.addEventListener('click', e => {
   const sheetToggle = t.closest('[data-sheet-toggle]');
   if (sheetToggle) {
     const id = sheetToggle.dataset.sheetToggle;
-    const was = state.mix.flavors.includes(id);
-    toggleFlavor(id);
+    const result = toggleFlavor(id);
     refreshSheetToggles();
-    if (!was && state.mix.flavors.includes(id)) toast(`${flavorById(id).name} added`);
+    if (result === 'added') toast(`${flavorById(id).name} added`);
     return;
   }
 
@@ -1580,9 +1748,9 @@ document.addEventListener('click', e => {
   const addFlavor = t.closest('[data-add-flavor]');
   if (addFlavor) {
     const id = addFlavor.dataset.addFlavor;
-    const was = state.mix.flavors.includes(id);
-    toggleFlavor(id);
-    if (was) toast('Removed from mix');
+    const result = toggleFlavor(id);
+    if (result === 'full') return;           // 'Three flavors max' already shown; sheet stays open
+    if (result === 'removed') { toast('Removed from mix'); addFlavor.textContent = 'Add to mix'; }
     else { toast(`${flavorById(id).name} added to the mix`); closeSheet(); setTimeout(() => go('mix', 'push'), 240); }
     return;
   }
@@ -1595,6 +1763,8 @@ document.addEventListener('click', e => {
 
   const decoBtn = t.closest('[data-open-deco]');
   if (decoBtn) { openDeco(); return; }
+
+  if (t.closest('[data-cancel-deco]')) { cancelDeco(); return; }
 
   const closeDecoBtn = t.closest('[data-close-deco]');
   if (closeDecoBtn) { closeDeco(); return; }
@@ -1645,7 +1815,7 @@ document.addEventListener('click', e => {
   if (remix) {
     const b = state.saved.find(x => x.id === remix.dataset.remix);
     if (b) {
-      state.mix = normalizeMix({
+      state.mix = sanitizeMix({
         base: b.base,
         flavors: [...b.flavors],
         sweet: b.sweet,
@@ -1675,19 +1845,13 @@ document.addEventListener('click', e => {
 // sliders
 ['sweet', 'fizz'].forEach(kind => {
   const el = $(`#${kind}Range`);
+  // input: recompute and redraw everything derived (name, color, glow, both dials, button)
   el.addEventListener('input', () => {
     state.mix[kind] = Number(el.value);
-    syncDial(kind);
-    const color = blendColor(state.mix);
-    $('#mixBottle').innerHTML = bottleStage({
-      color, fill: state.mix.flavors.length ? .82 : .62, fizz: state.mix.fizz, seed: 21,
-      finish: state.mix.finish, charms: state.mix.charms,
-    });
-    const btn = $('#brewBtn');
-    if (state.mix.flavors.length) btn.style.background = color;
-    btn.style.color = state.mix.flavors.length ? readableOn(color) : '#fff';
-    persist();
+    renderMix();
   });
+  // change: fires once when the drag ends (or per key press) — save then
+  el.addEventListener('change', persist);
 });
 
 $('#brewBtn').addEventListener('click', startBrew);
@@ -1709,7 +1873,7 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (sheetLayer.classList.contains('is-open')) closeSheet();
   const deco = $('#decoLayer');
-  if (deco && deco.classList.contains('is-open')) closeDeco();
+  if (deco && deco.classList.contains('is-open')) cancelDeco();
 });
 
 /* ───────────── boot ───────────── */
@@ -1731,7 +1895,7 @@ function demoSeed() {
       color: blendColor(e),
       date: Date.now() - Math.round((i + 1) * 1.2 * 864e5),
     }, e);
-    state.saved.push(normalizeBatch(b));
+    state.saved.push(sanitizeBatch(b));
   });
   persist();
 }
@@ -1751,12 +1915,11 @@ function bootRoute() {
         color: blendColor(mix), date: Date.now(),
       }, mix);
     }
-    renderResult(normalizeBatch(batch), !state.lastBatch);
-    go('result', 'fade');
+    renderResult(sanitizeBatch(batch), !state.lastBatch);
+    go('result', 'fade', { history: 'none' });
     return true;
   }
-  if (v === 'mix') { go('mix', 'fade'); return true; }
-  go(v, 'fade');
+  go(v, 'fade', { history: 'none' });
   return true;
 }
 
@@ -1779,5 +1942,11 @@ renderMix();
 updateTabs('home');
 initDeco();
 bootRoute();
+navState = { v: state.view, depth: 0, root: state.view };
+history.replaceState(navState, '', location.pathname + location.search + '#/' + state.view);
+
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
 
 })();

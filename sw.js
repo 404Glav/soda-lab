@@ -1,10 +1,11 @@
 /* Soda Lab service worker: cache-first app shell.
    Bump CACHE whenever any file in SHELL changes, or phones keep the old copy. */
-const CACHE = 'sodalab-v2';
+const CACHE = 'sodalab-v3';
 const SHELL = [
   './',
   './index.html',
   './styles.css',
+  './badges.js',
   './app.js',
   './manifest.json',
   './icons/favicon.ico',

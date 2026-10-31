@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<meta name="theme-color" content="#F6F5F2" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<title>Soda Lab</title>
+<meta name="description" content="A quiet little lab for loud little drinks. Mix, brew and shelf your own sodas." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23F2F1ED'/%3E%3Cpath d='M26 12h12v11c0 3 2 5 4 8 3 4 4 7 4 12v7c0 4-3 6-7 6H25c-4 0-7-2-7-6v-7c0-5 1-8 4-12 2-3 4-5 4-8V12Z' fill='%238FCFE0'/%3E%3Crect x='24' y='8' width='16' height='6' rx='3' fill='%2317171B'/%3E%3C/svg%3E" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<link rel="manifest" href="manifest.json" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="stage">
+  <div class="device">
+    <div class="island" aria-hidden="true"></div>
+
+    <div class="screen">
+      <div class="statusbar" aria-hidden="true">
+        <span class="sb-time" id="sbTime">9:41</span>
+        <span class="sb-right">
+          <svg viewBox="0 0 18 12" width="17" height="11"><rect x="0" y="7.5" width="3" height="4.5" rx="1"/><rect x="4.6" y="5" width="3" height="7" rx="1"/><rect x="9.2" y="2.5" width="3" height="9.5" rx="1"/><rect x="13.8" y="0" width="3" height="12" rx="1"/></svg>
+          <svg viewBox="0 0 16 12" width="16" height="12"><path d="M8 10.6a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/><path d="M3.4 6.9a6.5 6.5 0 0 1 9.2 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M1 4a10 10 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <svg viewBox="0 0 26 12" width="25" height="12"><rect x="0.6" y="0.6" width="21" height="10.8" rx="3" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".4"/><rect x="2.2" y="2.2" width="16" height="7.6" rx="1.8"/><path d="M23.4 4.2v3.6a2.1 2.1 0 0 0 0-3.6Z" opacity=".45"/></svg>
+        </span>
+      </div>
+
+      <main class="views" id="views">
+
+        <!-- ══════════════ HOME ══════════════ -->
+        <section class="view is-active" data-view="home">
+          <header class="page-head">
+            <div>
+              <div class="eyebrow" id="greeting">Good evening</div>
+              <h1 class="page-title">Soda Lab</h1>
+            </div>
+            <div class="avatar" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="21" height="21"><path d="M12 2.6c3.2 3.9 5.6 6.9 5.6 9.9a5.6 5.6 0 0 1-11.2 0c0-3 2.4-6 5.6-9.9Z" fill="currentColor"/></svg>
+            </div>
+          </header>
+
+          <div id="homeHero" class="home-hero"></div>
+
+          <div class="section-head">
+            <h2>Your shelf</h2>
+            <button class="link" data-go="shelf">See all</button>
+          </div>
+          <div class="shelf-row" id="homeShelf"></div>
+
+          <div class="section-head">
+            <h2>Flavor of the day</h2>
+            <button class="link" data-go="flavors">Library</button>
+          </div>
+          <div id="dailyFlavor"></div>
+
+          <p class="footnote">Mixed in small batches. No concentrate, no shortcuts.</p>
+        </section>
+
+        <!-- ══════════════ MIX ══════════════ -->
+        <section class="view view--mix" data-view="mix">
+          <div class="mix-topbar">
+            <button class="icon-btn" data-back aria-label="Back">
+              <svg viewBox="0 0 24 24" width="22" height="22"><path d="M14.5 5 8 12l6.5 7" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="mix-title">New batch</div>
+            <button class="text-btn" id="mixReset">Reset</button>
+          </div>
+
+          <div class="mix-stage" id="mixStage">
+            <div class="stage-wash" id="mixWash"></div>
+            <div class="mix-bottle" id="mixBottle"></div>
+            <div class="mix-readout">
+              <div class="mix-name" id="mixName">Plain Sparkle</div>
+              <div class="mix-sub" id="mixSub">Soda water</div>
+            </div>
+          </div>
+
+          <div class="mix-scroll" id="mixScroll">
+            <div class="block">
+              <div class="block-head"><h3>Base</h3></div>
+              <div class="base-row" id="baseRow"></div>
+            </div>
+
+            <div class="block">
+              <div class="block-head">
+                <h3>Flavors</h3>
+                <span class="counter" id="flavorCount">0 / 3</span>
+              </div>
+              <div class="chip-grid" id="flavorChips"></div>
+            </div>
+
+            <div class="block">
+              <div class="block-head"><h3>Tune</h3></div>
+              <div class="dial" data-dial="sweet">
+                <div class="dial-top"><span>Sweetness</span><span class="dial-val" id="sweetVal">Balanced</span></div>
+                <input type="range" min="0" max="5" step="1" value="3" id="sweetRange" aria-label="Sweetness" />
+                <div class="ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              </div>
+              <div class="dial" data-dial="fizz">
+                <div class="dial-top"><span>Fizz</span><span class="dial-val" id="fizzVal">Crisp</span></div>
+                <input type="range" min="0" max="5" step="1" value="3" id="fizzRange" aria-label="Carbonation" />
+                <div class="ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              </div>
+            </div>
+
+            <div class="block">
+              <div class="block-head"><h3>Serve</h3></div>
+              <div class="temp-row" id="tempRow"></div>
+            </div>
+
+            <div class="block block--note">
+              <p id="mixHint">Pick a base and up to three flavors. The lab handles the rest.</p>
+            </div>
+          </div>
+
+          <div class="mix-cta">
+            <button class="brew-btn" id="brewBtn">
+              <span>Brew it</span>
+              <svg viewBox="0 0 24 24" width="19" height="19"><path d="M5 12h13m-5-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </section>
+
+        <!-- ══════════════ SHELF ══════════════ -->
+        <section class="view" data-view="shelf">
+          <header class="page-head page-head--sub">
+            <div>
+              <div class="eyebrow">Your collection</div>
+              <h1 class="page-title">Shelf</h1>
+            </div>
+          </header>
+          <div class="shelf-grid" id="shelfGrid"></div>
+          <div class="empty" id="shelfEmpty" hidden>
+            <div class="empty-art" aria-hidden="true">
+              <svg viewBox="0 0 140 96" width="118" height="81">
+                <rect x="14" y="10" width="48" height="54" rx="13" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="5 6" opacity=".38"/>
+                <rect x="78" y="10" width="48" height="54" rx="13" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="5 6" opacity=".22"/>
+                <path d="M6 80h128" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity=".25"/>
+              </svg>
+            </div>
+            <h3>Nothing on the shelf yet</h3>
+            <p>Your first batch is one tap away. Mix it, brew it, name it.</p>
+            <button class="pill-btn" data-go="mix">Start a batch</button>
+          </div>
+        </section>
+
+        <!-- ══════════════ FLAVORS ══════════════ -->
+        <section class="view" data-view="flavors">
+          <header class="page-head page-head--sub">
+            <div>
+              <div class="eyebrow">The pantry</div>
+              <h1 class="page-title">Flavors</h1>
+            </div>
+          </header>
+          <div class="search">
+            <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="11" cy="11" r="6.4" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <input id="flavorSearch" type="search" placeholder="Search flavors" autocomplete="off" spellcheck="false" aria-label="Search flavors" />
+          </div>
+          <div class="flavor-list" id="flavorList"></div>
+        </section>
+
+        <!-- ══════════════ RESULT ══════════════ -->
+        <section class="view view--result" data-view="result">
+          <div class="result-scroll" id="resultBody"></div>
+        </section>
+
+      </main>
+
+      <nav class="tabbar" id="tabbar" aria-label="Sections">
+        <button class="tab is-active" data-go="home">
+          <svg viewBox="0 0 24 24" width="23" height="23"><path d="M9 3.5h6v5.2l3.6 8.1A2.6 2.6 0 0 1 16.2 21H7.8a2.6 2.6 0 0 1-2.4-4.2L9 8.7V3.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M6.6 15.2h10.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span>Lab</span>
+        </button>
+        <button class="tab" data-go="shelf">
+          <svg viewBox="0 0 24 24" width="23" height="23"><rect x="3.4" y="4.2" width="7.4" height="7.4" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13.2" y="4.2" width="7.4" height="7.4" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="3.4" y="14" width="7.4" height="7.4" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="13.2" y="14" width="7.4" height="7.4" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+          <span>Shelf</span>
+        </button>
+        <button class="tab" data-go="flavors">
+          <svg viewBox="0 0 24 24" width="23" height="23"><path d="M20 4c0 9-4.2 13.4-9.6 13.4A6.4 6.4 0 0 1 4 11c0-4.6 5.4-5.6 9.4-6.2C17 4.3 20 4 20 4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 21c1.4-4.6 5-8.4 10-10.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span>Flavors</span>
+        </button>
+      </nav>
+
+      <!-- sheets / overlays -->
+      <div class="sheet-layer" id="sheetLayer" hidden>
+        <div class="sheet-scrim" data-close-sheet></div>
+        <div class="sheet" id="sheet" role="dialog" aria-modal="true">
+          <div class="sheet-grip" data-close-sheet></div>
+          <div class="sheet-body" id="sheetBody"></div>
+        </div>
+      </div>
+
+      <div class="brew-layer" id="brewLayer" hidden>
+        <div class="brew-inner">
+          <div class="brew-bottle" id="brewBottle"></div>
+          <div class="brew-step" id="brewStep">Chilling the glass</div>
+          <div class="brew-bar"><span id="brewBar"></span></div>
+          <div class="brew-brand">Soda Lab</div>
+        </div>
+      </div>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

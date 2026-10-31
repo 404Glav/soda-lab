@@ -1,0 +1,14 @@
+{
+  "name": "Soda Lab",
+  "short_name": "Soda Lab",
+  "description": "A quiet little lab for loud little drinks. Mix, brew and shelf your own sodas.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F4F1",
+  "theme_color": "#F5F4F1",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

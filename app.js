@@ -558,12 +558,66 @@ const KEY = 'sodalab.v1';
 
 const defaultMix = () => ({ base:'soda', flavors:[], sweet:3, fizz:3, temp:'ice', finish:'none', charms:[] });
 
-function normalizeMix(m) {
-  const mix = Object.assign(defaultMix(), m || {});
-  if (!Array.isArray(mix.flavors)) mix.flavors = [];
-  if (!Array.isArray(mix.charms)) mix.charms = [];
-  if (!FINISHES.some(f => f.id === mix.finish)) mix.finish = 'none';
-  return mix;
+/* ───────────── saved-data validation ─────────────
+   Everything read from localStorage goes through sanitizeMix / sanitizeBatch,
+   so render code can trust ids, numbers and colors. Free text (names) is
+   escaped with esc() wherever it is put into HTML. */
+
+const ID_RE  = /^[A-Za-z0-9_-]{1,64}$/;
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+const ESC_MAP = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' };
+const esc = s => String(s).replace(/[&<>"']/g, c => ESC_MAP[c]);
+const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+const intIn = (v, a, b, d) => (Number.isInteger(v) && v >= a && v <= b ? v : d);
+const numIn = (v, a, b, d) => (typeof v === 'number' && Number.isFinite(v) ? clamp(v, a, b) : d);
+
+function sanitizeCharms(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter(c => isObj(c) && charmById(c.id))
+    .slice(0, MAX_CHARMS)
+    .map(c => ({ id: c.id, x: numIn(c.x, 0, 100, 50), y: numIn(c.y, 0, 100, 50), rot: numIn(c.rot, -45, 45, 0) }));
+}
+
+function sanitizeMix(m) {
+  const d = defaultMix();
+  if (!isObj(m)) return d;
+  const flavors = Array.isArray(m.flavors)
+    ? m.flavors.filter((id, i, a) => typeof id === 'string' && flavorById(id) && a.indexOf(id) === i).slice(0, 3)
+    : [];
+  return {
+    base:    BASES.some(b => b.id === m.base) ? m.base : d.base,
+    flavors,
+    sweet:   intIn(m.sweet, 0, 5, d.sweet),
+    fizz:    intIn(m.fizz, 0, 5, d.fizz),
+    temp:    TEMPS.some(t => t.id === m.temp) ? m.temp : d.temp,
+    finish:  FINISHES.some(f => f.id === m.finish) ? m.finish : d.finish,
+    charms:  sanitizeCharms(m.charms),
+  };
+}
+
+/* Returns a clean batch, or null if the entry is unusable. Missing rarity and
+   rating are filled in (older saves), exactly as before. */
+function sanitizeBatch(b) {
+  if (!isObj(b)) return null;
+  const mix = sanitizeMix(b);
+  const id = typeof b.id === 'string' && ID_RE.test(b.id) ? b.id : 'r' + hashStr(JSON.stringify(b)).toString(36);
+  const name = typeof b.name === 'string' && b.name.trim() ? b.name.trim().slice(0, 80) : makeName(mix);
+  const out = Object.assign({
+    id,
+    num:   intIn(b.num, 0, 1e9, 0),
+    name,
+  }, mix, {
+    color: typeof b.color === 'string' && HEX_RE.test(b.color) ? b.color : blendColor(mix),
+    date:  numIn(b.date, 0, 8.64e15, Date.now()),
+  });
+  if (b.merged === true) {
+    out.merged = true;
+    out.lineage = Array.isArray(b.lineage) ? b.lineage.filter(x => typeof x === 'string' && ID_RE.test(x)).slice(0, 2) : [];
+  }
+  out.rarity = RARITY.some(r => r.id === b.rarity) ? b.rarity : rollRarity(out.id, luckOf(out)).id;
+  out.rating = typeof b.rating === 'number' && Number.isFinite(b.rating) ? Math.round(clamp(b.rating, 0, 100)) : scoreOf(out);
+  return out;
 }
 
 function luckOf(b) {
@@ -610,16 +664,6 @@ function scoreOf(b) {
   return Math.round(clamp(48 + harmony * 20 + complexity * 12 + bonus, 40, 99));
 }
 
-function normalizeBatch(b) {
-  if (!b || typeof b !== 'object') return b;
-  if (!b.finish) b.finish = 'none';
-  if (!Array.isArray(b.charms)) b.charms = [];
-  if (!Array.isArray(b.flavors)) b.flavors = [];
-  if (!b.rarity) b.rarity = rollRarity(b.id || b.name || 'seed', luckOf(b)).id;
-  if (typeof b.rating !== 'number') b.rating = scoreOf(b);
-  return b;
-}
-
 const state = {
   view: 'home',
   mix: defaultMix(),
@@ -635,9 +679,13 @@ function load() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return;
     const d = JSON.parse(raw);
-    if (Array.isArray(d.saved)) state.saved = d.saved.map(normalizeBatch);
-    if (typeof d.count === 'number') state.count = d.count;
-    if (d.mix) state.mix = normalizeMix(d.mix);
+    if (!isObj(d)) return;
+    if (Array.isArray(d.saved)) {
+      const seen = new Set();
+      state.saved = d.saved.map(sanitizeBatch).filter(b => b && !seen.has(b.id) && seen.add(b.id));
+    }
+    state.count = Math.max(intIn(d.count, 0, 1e9, 0), 0, ...state.saved.map(b => b.num));
+    if (d.mix) state.mix = sanitizeMix(d.mix);
   } catch (e) { /* storage unavailable — carry on */ }
 }
 function persist() {
@@ -754,11 +802,11 @@ function renderHome() {
     </button>`;
   } else {
     row.innerHTML = state.saved.slice(0, 6).map(b => `
-      <button class="mini-card" data-batch="${b.id}">
+      <button class="mini-card" data-batch="${esc(b.id)}">
         <div class="mini-art" style="background:linear-gradient(160deg, ${lighten(b.color,.86)}, ${lighten(b.color,.94)})">
           ${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 999, finish:b.finish, charms:b.charms, still:true })}
         </div>
-        <div class="mini-name">${b.name}</div>
+        <div class="mini-name">${esc(b.name)}</div>
         <div class="mini-meta">${dateLabel(b.date)} · ${rarityById(b.rarity).name}</div>
       </button>`).join('');
   }
@@ -1030,7 +1078,7 @@ function renderResult(batch, fresh) {
         radial-gradient(46% 42% at 50% 42%, ${rgba(color,.30)} 0%, ${rgba(color,.08)} 55%, transparent 76%)"></div>
       <div class="result-bottle">${bottleStage({ color, fill:.84, fizz:batch.fizz, seed:11, finish:batch.finish, charms:batch.charms })}</div>
       <div class="result-eyebrow">${fresh ? 'Freshly brewed' : 'From your shelf'}</div>
-      <h1 class="result-name">${batch.name}</h1>
+      <h1 class="result-name">${esc(batch.name)}</h1>
       <div class="result-sub">${baseById(batch.base).name} · ${batch.flavors.length ? batch.flavors.map(fname).join(', ') : 'No flavors'}</div>
       <div class="rarity-badge" style="--rc:${rarity.color}" title="Rolled at brew time">
         <span class="rarity-stars">${'★'.repeat(rarity.stars)}<span class="rarity-dim">${'★'.repeat(6 - rarity.stars)}</span></span>
@@ -1124,12 +1172,12 @@ function renderShelf() {
   grid.innerHTML = state.saved.map(b => {
     const r = rarityById(b.rarity);
     return `
-    <button class="batch-card" data-batch="${b.id}">
+    <button class="batch-card" data-batch="${esc(b.id)}">
       <div class="batch-art" style="background:linear-gradient(155deg, ${lighten(b.color,.84)} 0%, ${lighten(b.color,.93)} 100%)">
         ${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 997, finish:b.finish, charms:b.charms, still:true })}
         <span class="rarity-chip" style="--rc:${r.color}">${r.name}</span>
       </div>
-      <div class="batch-name">${b.name}</div>
+      <div class="batch-name">${esc(b.name)}</div>
       <div class="batch-meta">${dateLabel(b.date)} · ${b.rating}/100</div>
     </button>`;
   }).join('');
@@ -1205,7 +1253,6 @@ function openFlavorSheet(id) {
 function openBatchSheet(id) {
   const b = state.saved.find(x => x.id === id);
   if (!b) return;
-  normalizeBatch(b);
   const r = rarityById(b.rarity);
   const fin = finishById(b.finish);
   const rows = [
@@ -1225,13 +1272,13 @@ function openBatchSheet(id) {
       <div style="width:48px">${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 997, finish:b.finish, charms:b.charms })}</div>
       <span class="sheet-rarity" style="--rc:${r.color}">${'★'.repeat(r.stars)} ${r.name}</span>
     </div>
-    <h2 class="sheet-title">${b.name}</h2>
+    <h2 class="sheet-title">${esc(b.name)}</h2>
     <div class="sheet-note">Batch ${String(b.num).padStart(3,'0')} · ${b.rating}/100</div>
     <div class="sheet-list">${rows}</div>
     <div class="sheet-actions">
-      <button class="btn-primary" data-remix="${b.id}">Mix this again</button>
-      <button class="btn-ghost" data-merge-this="${b.id}">Merge with another</button>
-      <button class="danger-btn" data-remove-batch="${b.id}">Remove from shelf</button>
+      <button class="btn-primary" data-remix="${esc(b.id)}">Mix this again</button>
+      <button class="btn-ghost" data-merge-this="${esc(b.id)}">Merge with another</button>
+      <button class="danger-btn" data-remove-batch="${esc(b.id)}">Remove from shelf</button>
     </div>`);
 }
 
@@ -1308,12 +1355,12 @@ function mergeCandidates() {
 
 function mergeRow(b, on) {
   const r = rarityById(b.rarity);
-  return `<button class="merge-row ${on ? 'is-on' : ''}" data-merge-pick="${b.id}">
+  return `<button class="merge-row ${on ? 'is-on' : ''}" data-merge-pick="${esc(b.id)}">
     <span class="merge-art" style="background:linear-gradient(155deg, ${lighten(b.color,.86)}, ${lighten(b.color,.94)})">
       ${bottleStage({ color:b.color, fill:.8, fizz:b.fizz, seed:hashStr(b.id) % 997, finish:b.finish, still:true })}
     </span>
     <span class="merge-copy">
-      <span class="mr-name">${b.name}</span>
+      <span class="mr-name">${esc(b.name)}</span>
       <span class="mr-meta"><i class="rc-dot" style="background:${r.color}"></i>${r.name} · ${b.rating}/100</span>
     </span>
     <span class="merge-check">${on ? '✓' : ''}</span>
@@ -1330,7 +1377,7 @@ function mergePreviewMarkup(a, b) {
     </div>
     <div class="merge-preview-copy">
       <div class="mp-kicker">The blend</div>
-      <div class="mp-name">${mergeName(a, b)}</div>
+      <div class="mp-name">${esc(mergeName(a, b))}</div>
       <div class="mp-sub">${mix.flavors.length ? mix.flavors.map(fname).join(' · ') : 'No flavors'} · ${fin.name}</div>
       <div class="mp-bonus">Merged batches roll with better rarity odds.</div>
     </div>
@@ -1647,7 +1694,7 @@ document.addEventListener('click', e => {
   if (remix) {
     const b = state.saved.find(x => x.id === remix.dataset.remix);
     if (b) {
-      state.mix = normalizeMix({
+      state.mix = sanitizeMix({
         base: b.base,
         flavors: [...b.flavors],
         sweet: b.sweet,
@@ -1733,7 +1780,7 @@ function demoSeed() {
       color: blendColor(e),
       date: Date.now() - Math.round((i + 1) * 1.2 * 864e5),
     }, e);
-    state.saved.push(normalizeBatch(b));
+    state.saved.push(sanitizeBatch(b));
   });
   persist();
 }
@@ -1753,7 +1800,7 @@ function bootRoute() {
         color: blendColor(mix), date: Date.now(),
       }, mix);
     }
-    renderResult(normalizeBatch(batch), !state.lastBatch);
+    renderResult(sanitizeBatch(batch), !state.lastBatch);
     go('result', 'fade');
     return true;
   }

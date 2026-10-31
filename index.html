@@ -46,6 +46,7 @@
           </header>
 
           <div id="homeHero" class="home-hero"></div>
+          <div id="homeBadges"></div>
 
           <div class="section-head">
             <h2>Your shelf</h2>
@@ -149,10 +150,13 @@
               <div class="eyebrow">Your collection</div>
               <h1 class="page-title">Shelf</h1>
             </div>
-            <button class="merge-btn" id="mergeBtn" data-merge-start hidden>
-              <svg viewBox="0 0 24 24" width="15" height="15"><circle cx="9" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="15" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
-              Merge
-            </button>
+            <div class="head-actions">
+              <button class="merge-btn" id="mergeBtn" data-merge-start hidden>
+                <svg viewBox="0 0 24 24" width="15" height="15"><circle cx="9" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="15" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+                Merge
+              </button>
+              <button class="badge-btn" id="shelfBadges" data-go="badges" aria-label="Badges" hidden></button>
+            </div>
           </header>
           <div class="shelf-grid" id="shelfGrid"></div>
           <div class="empty" id="shelfEmpty" hidden>
@@ -182,6 +186,23 @@
             <input id="flavorSearch" type="search" placeholder="Search flavors" autocomplete="off" spellcheck="false" aria-label="Search flavors" />
           </div>
           <div class="flavor-list" id="flavorList"></div>
+        </section>
+
+        <!-- ══════════════ BADGES ══════════════ -->
+        <section class="view view--badges" data-view="badges">
+          <div class="badges-top">
+            <button class="icon-btn" data-badges-back aria-label="Back">
+              <svg viewBox="0 0 24 24" width="22" height="22"><path d="M14.5 5 8 12l6.5 7" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+          <header class="page-head page-head--sub">
+            <div>
+              <div class="eyebrow">Your collection</div>
+              <h1 class="page-title">Badges</h1>
+            </div>
+          </header>
+          <div id="badgesBody"></div>
+          <p class="footnote">Badges are just for fun. They never change your odds.</p>
         </section>
 
         <!-- ══════════════ RESULT ══════════════ -->
@@ -247,10 +268,13 @@
         </div>
       </div>
 
+      <div class="bb-layer" id="bbLayer" aria-live="polite"></div>
+
       <div class="toast" id="toast" role="status" aria-live="polite"></div>
     </div>
   </div>
 </div>
+<script src="badges.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

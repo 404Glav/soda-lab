@@ -1,10 +1,11 @@
 /* Soda Lab service worker: cache-first app shell.
    Bump CACHE whenever any file in SHELL changes, or phones keep the old copy. */
-const CACHE = 'sodalab-v2';
+const CACHE = 'sodalab-v3';
 const SHELL = [
   './',
   './index.html',
   './styles.css',
+  './badges.js',
   './app.js',
   './manifest.json',
   './icons/favicon.ico',
@@ -14,6 +15,11 @@ const SHELL = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/maskable-512.png',
+  './icons/badges/mystery.svg',
+  ...['first-pour', 'shelf-starter', 'lab-regular', 'full-glass', 'dressed-up', 'fully-charmed', 'encore',
+    'lucky-pour', 'epic-find', 'legend-in-a-bottle', 'mythic', 'base-tour', 'pantry-explorer',
+    'secret-recipe', 'combo-hunter', 'fusion', 'family-tree', 'flavor-of-the-day']
+    .flatMap(id => [`./icons/badges/${id}.svg`, `./icons/badges/${id}-locked.svg`]),
 ];
 
 self.addEventListener('install', e => {

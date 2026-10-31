@@ -1084,7 +1084,7 @@ function renderResult(batch, fresh) {
         <svg viewBox="0 0 24 24" width="22" height="22"><path d="M14.5 5 8 12l6.5 7" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <span style="font-size:11.5px;font-weight:650;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)">Batch ${String(batch.num).padStart(3,'0')}</span>
-      <button class="icon-btn" id="shareBtn" aria-label="Copy recipe">
+      <button class="icon-btn" id="shareBtn" aria-label="Share recipe">
         <svg viewBox="0 0 24 24" width="19" height="19"><path d="M12 3v11m0-11 4 4m-4-4-4 4M5 14v4.4c0 1 .8 1.6 1.7 1.6h10.6c1 0 1.7-.6 1.7-1.6V14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     </div>
@@ -1160,9 +1160,36 @@ function renderResult(batch, fresh) {
     const fin = finishById(batch.finish);
     const rarity = rarityById(batch.rarity);
     const txt = `${batch.name} — Soda Lab\n${baseById(batch.base).name}, ${batch.flavors.map(fname).join(', ')}\n${rarity.name} · ${batch.rating}/100 · Sweetness ${batch.sweet}/5 · Fizz ${batch.fizz}/5 · ${(TEMPS.find(t => t.id === batch.temp) || TEMPS[0]).label}${fin.id !== 'none' ? ` · ${fin.name} finish` : ''}`;
-    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(txt).then(() => toast('Recipe copied'), () => toast('Could not copy'));
-    else toast('Recipe copied');
+    shareText(txt, batch.name).then(result => {
+      if (result === 'copied') toast('Recipe copied');
+      else if (result === 'failed') toast('Could not copy');
+      // 'shared' / 'cancelled': the system share sheet was the feedback
+    });
   });
+}
+
+/* Share sheet first (phones), then the async clipboard, then the legacy copy
+   path (works on plain http). Resolves 'shared' | 'cancelled' | 'copied' | 'failed'. */
+async function shareText(text, title) {
+  if (typeof navigator.share === 'function') {
+    try { await navigator.share({ title, text }); return 'shared'; }
+    catch (e) { if (e && e.name === 'AbortError') return 'cancelled'; }
+  }
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    try { await navigator.clipboard.writeText(text); return 'copied'; } catch (e) { /* fall through */ }
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    if (ok) return 'copied';
+  } catch (e) { /* fall through */ }
+  return 'failed';
 }
 
 /* ───────────── shelf ───────────── */

@@ -754,7 +754,7 @@ const TAB_VIEWS = ['home', 'shelf', 'flavors'];
    { v: view, depth: entries pushed since boot, root: view at depth 0 }.
    Tab-to-tab moves (except leaving the Lab) replace instead of push, so the
    phone's back button walks back through screens, not every tab tap. */
-const VIEW_RE = /^#\/(home|shelf|flavors|mix|result)\b/;
+const VIEW_RE = /^#\/(home|shelf|flavors|mix|result|badges)\b/;
 const viewFromHash = () => (location.hash.match(VIEW_RE) || [])[1] || null;
 let navState = { v: 'home', depth: 0, root: 'home' };
 
@@ -774,6 +774,7 @@ function historyModeFor(from, to) {
 
 /* go(name, dir = 'push' | 'pop' | 'fade', { history: 'push' | 'replace' | 'none' }) */
 function go(name, dir = 'push', opts = {}) {
+  if (name === 'badges' && !badgesOn()) name = 'home';
   const next = document.querySelector(`.view[data-view="${name}"]`);
   const cur  = document.querySelector('.view.is-active');
   if (!next || next === cur) return;
@@ -784,6 +785,7 @@ function go(name, dir = 'push', opts = {}) {
   if (name === 'flavors') { renderFlavorList(); next.scrollTop = 0; }
   if (name === 'mix')   { renderMix(); }
   if (name === 'result') { $('#resultBody').scrollTop = 0; }
+  if (name === 'badges') { renderBadges(); next.scrollTop = 0; }
 
   const enterCls = dir === 'fade' ? 'enter-fade' : dir === 'pop' ? 'enter-left' : 'enter-right';
   next.classList.add(enterCls);
@@ -797,6 +799,7 @@ function go(name, dir = 'push', opts = {}) {
   state.view = name;
   tabbar.classList.toggle('is-hidden', !TAB_VIEWS.includes(name));
   updateTabs(name);
+  badgeRoute(name, next);
 }
 
 function updateTabs(name = state.view) {
@@ -857,6 +860,7 @@ document.addEventListener('click', e => {
     return;
   }
   if (e.target.closest('[data-back]')) { e.preventDefault(); back(); }
+  if (e.target.closest('[data-badges-back]')) { e.preventDefault(); badgesBack(); }
 });
 
 /* ───────────── home ───────────── */
@@ -890,6 +894,7 @@ function renderHome() {
     <div class="hero-art">${bottleStage({ color, fill:.8, fizz:mix.fizz, seed:7, finish:mix.finish, charms:mix.charms })}</div>`;
 
   hero.onclick = () => go('mix', 'push');
+  renderHomeBadges();
 
   const row = $('#homeShelf');
   if (!state.saved.length) {
@@ -1321,6 +1326,7 @@ function renderShelf() {
   const empty = $('#shelfEmpty');
   const mergeBtn = $('#mergeBtn');
   if (mergeBtn) mergeBtn.hidden = state.saved.length < 2;
+  renderShelfBadges();
   const eyebrow = document.querySelector('[data-view="shelf"] .eyebrow');
   if (eyebrow) eyebrow.textContent = state.saved.length
     ? `Your collection · ${state.saved.length} bottle${state.saved.length === 1 ? '' : 's'}`
@@ -1807,6 +1813,353 @@ function initDeco() {
   stage.addEventListener('pointercancel', end);
 }
 
+/* ───────────── badges (UI over window.SodaBadges) ───────────── */
+
+/* Forge's badges.js owns the data; everything here only reads it. Art lives in
+   icons/badges: <icon>.svg earned, <icon>-locked.svg locked, mystery.svg for
+   any unearned hidden badge. Tier colours come from .tier-<tier> in styles.css. */
+const BADGE_THEMES = { brewing:'Brewing', rarity:'Rarity', variety:'Variety', combos:'Combos', merging:'Merging', daily:'Daily' };
+const BADGE_UNITS = { 'lab-regular':'brews', 'base-tour':'bases', 'pantry-explorer':'flavors', 'combo-hunter':'combos' };
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+const badgesOn = () => !!window.SodaBadges && !DEMO;
+const tierRank = t => window.SodaBadges.TIERS.indexOf(t);
+const unseenCount = s => (Array.isArray(s.unseen) ? s.unseen.length : s.unseen) || 0;
+const badgeSrc = b => `icons/badges/${b.earnedAt ? b.icon : b.hidden ? 'mystery' : b.icon + '-locked'}.svg`;
+const badgeImg = (b, px) => `<img class="b-art" src="${esc(badgeSrc(b))}" width="${px}" height="${px}" alt="" decoding="async" draggable="false">`;
+const badgeDate = (ts, year) => new Date(ts).toLocaleDateString(undefined, year ? { month:'short', day:'numeric', year:'numeric' } : { month:'short', day:'numeric' });
+const progressLabel = b => `${Number(b.progress.n)} / ${Number(b.progress.of)}${BADGE_UNITS[b.id] ? ' ' + BADGE_UNITS[b.id] : ''}`;
+const firstSentence = s => (String(s).match(/^.*?[.!?](\s|$)/) || [s])[0].trim();
+const barFill = (n, of) => `<span class="b-bar"><span style="transform:translateX(${Math.round(Math.min(1, n / of) * 100) - 100}%)"></span></span>`;
+const byTier = list => list.slice().sort((a, b) => tierRank(b.tier) - tierRank(a.tier));
+const topEarned = (list, n) => byTier(list.filter(b => b.earnedAt)).slice(0, n);
+const getBadge = id => window.SodaBadges.getBadges().find(b => b.id === id);
+const badgeTotals = () => { const s = window.SodaBadges.badgeSummary(); return { earned: Number(s.earned) || 0, total: Number(s.total) || 0, unseen: unseenCount(s) }; };
+const setHTML = (el, html) => { if (el._html !== html) { el._html = html; el.innerHTML = html; } };
+
+function badgeFan(list, px) {
+  return `<span class="b-fan">${list.map((b, i) => `<span class="tier-${esc(b.tier)}" style="z-index:${3 - i}">${badgeImg(b, px)}</span>`).join('')}</span>`;
+}
+
+/* Lab row + Shelf header button (rendered with their screens, in place) */
+function renderHomeBadges() {
+  const host = $('#homeBadges');
+  if (!badgesOn()) { host.hidden = true; return; }
+  const all = window.SodaBadges.getBadges();
+  const sum = badgeTotals();
+  const unseen = sum.unseen;
+  const fan = sum.earned ? topEarned(all, 3) : ['first-pour', 'shelf-starter', 'full-glass'].map(id => all.find(b => b.id === id)).filter(Boolean);
+  host.hidden = false;
+  setHTML(host, `
+    <button class="badge-row" data-go="badges">
+      ${badgeFan(fan, 36)}
+      <span class="badge-row-copy">
+        <span class="badge-row-name">Badges</span>
+        <span class="badge-row-sub">${sum.earned} of ${sum.total} earned${unseen ? ` · ${unseen} new` : ''}</span>
+      </span>
+      ${unseen ? '<i class="b-dot" aria-label="New badges"></i>' : ''}
+      <svg class="daily-chev" viewBox="0 0 24 24" width="18" height="18"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>`);
+}
+
+function renderShelfBadges() {
+  const btn = $('#shelfBadges');
+  if (!badgesOn()) { btn.hidden = true; return; }
+  const sum = badgeTotals();
+  const top = topEarned(window.SodaBadges.getBadges(), 1)[0];
+  btn.hidden = false;
+  btn.setAttribute('aria-label', `Badges, ${sum.earned} of ${sum.total}`);
+  setHTML(btn, `${top ? badgeImg(top, 26) : '<img class="b-art" src="icons/badges/mystery.svg" width="26" height="26" alt="">'}
+    <span>${sum.earned} / ${sum.total}</span>${sum.unseen ? '<i class="b-dot"></i>' : ''}`);
+}
+
+/* #/badges */
+let badgeSeenIO = null;
+
+function badgeTile(b) {
+  const masked = b.hidden && !b.earnedAt;
+  const sub = b.earnedAt ? badgeDate(b.earnedAt)
+    : masked ? firstSentence(b.hint || '')
+    : b.progress ? progressLabel(b)
+    : b.short || b.how;
+  return `
+    <button class="badge-tile tier-${esc(b.tier)}${b.earnedAt ? ' is-earned' : ''}" data-badge="${esc(b.id)}">
+      ${badgeImg(b, 64)}
+      <span class="bt-name">${esc(masked ? '?' : b.name)}</span>
+      <span class="bt-sub">${esc(sub)}</span>
+      ${!b.earnedAt && b.progress ? barFill(b.progress.n, b.progress.of) : ''}
+      ${b.unseen ? '<i class="b-dot"></i>' : ''}
+    </button>`;
+}
+
+function renderBadges() {
+  const all = window.SodaBadges.getBadges();
+  const sum = badgeTotals();
+  const unseen = sum.unseen;
+  const tiers = window.SodaBadges.TIERS.filter(t => all.some(b => b.tier === t));
+  const themes = [...new Set([...Object.keys(BADGE_THEMES), ...all.map(b => b.theme)])].filter(t => all.some(b => b.theme === t));
+  setHTML($('#badgesBody'), `
+    <div class="badge-summary">
+      <div class="eyebrow">Badges earned</div>
+      <div class="bs-count"><b>${sum.earned}</b><span>of ${sum.total}</span></div>
+      ${unseen ? `<span class="bs-new"><i></i>${unseen} new</span>` : ''}
+      ${barFill(sum.earned, sum.total).replace('b-bar', 'b-bar bs-bar')}
+      <div class="bs-tiers" style="--cols:${tiers.length}">${tiers.map(t => {
+        const of = all.filter(b => b.tier === t);
+        return `<span class="tier-${esc(t)}"><i></i>${of.filter(b => b.earnedAt).length}/${of.length}</span>`;
+      }).join('')}</div>
+    </div>
+    ${themes.map(t => {
+      const list = all.filter(b => b.theme === t);
+      return `<div class="section-head"><h2>${esc(BADGE_THEMES[t] || cap(t))}</h2><span class="link">${list.filter(b => b.earnedAt).length} of ${list.length}</span></div>
+        <div class="badge-grid">${list.map(badgeTile).join('')}</div>`;
+    }).join('')}`);
+  watchUnseen();
+}
+
+// An unseen tile counts as seen once most of it has been on screen; its dot then fades.
+function watchUnseen() {
+  if (badgeSeenIO) badgeSeenIO.disconnect();
+  const tiles = $$('#badgesBody .badge-tile .b-dot').map(d => d.parentElement);
+  if (!tiles.length) return;
+  badgeSeenIO = new IntersectionObserver(entries => {
+    const ids = entries.filter(e => e.isIntersecting).map(e => e.target);
+    if (!ids.length) return;
+    ids.forEach(el => { badgeSeenIO.unobserve(el); el.classList.add('is-seen'); });
+    window.SodaBadges.markBadgesSeen(ids.map(el => el.dataset.badge));
+  }, { root: $('.view[data-view="badges"]'), threshold: .6 });
+  tiles.forEach(el => badgeSeenIO.observe(el));
+}
+
+function badgesBack() {
+  if (navState.depth > 0) history.back();
+  else go('home', 'pop', { history: 'replace' });
+}
+
+function openBadgeSheet(id) {
+  const b = getBadge(id);
+  if (!b) return;
+  window.SodaBadges.markBadgesSeen([id]);
+  document.querySelector(`.badge-tile[data-badge="${CSS.escape(id)}"]`)?.classList.add('is-seen');
+  const masked = b.hidden && !b.earnedAt;
+  const bottle = b.batchExists ? state.saved.find(x => x.id === b.batch) : null;
+  const group = esc(BADGE_THEMES[b.theme] || cap(b.theme));
+  const li = (k, v) => `<div class="sheet-li"><span class="k">${k}</span><span class="v">${v}</span></div>`;
+  const rows = b.earnedAt ? [
+      li('Earned', badgeDate(b.earnedAt, true)), li('Group', group),
+      b.batch ? (bottle
+        ? `<button class="sheet-li" data-badge-bottle="${esc(bottle.id)}"><span class="k">Bottle</span><span class="v bsh-bottle"><i style="background:${bottle.color}"></i>${esc(bottle.name)}<svg viewBox="0 0 24 24" width="16" height="16"><path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>`
+        : li('Bottle', '<span class="bsh-gone">No longer on your shelf</span>')) : '']
+    : masked ? [li('How to earn', '?'), li('Group', group)]
+    : [li('Group', group), li('Progress', b.progress ? esc(progressLabel(b)) : 'Not yet')];
+  openSheet(`
+    <div class="bsh-hero tier-${esc(b.tier)}${b.earnedAt ? ' is-earned' : ''}">${badgeImg(b, 140)}</div>
+    <span class="tier-chip tier-${masked ? 'common' : esc(b.tier)}">${masked ? 'Hidden' : esc(cap(b.tier))}</span>
+    <h2 class="sheet-title bsh-title">${esc(masked ? '?' : b.name)}</h2>
+    <p class="sheet-desc bsh-desc">${esc(masked ? b.hint || '?' : b.how.replace(/\.?$/, '.'))}</p>
+    ${!b.earnedAt && b.progress ? barFill(b.progress.n, b.progress.of).replace('b-bar', 'b-bar bsh-bar') : ''}
+    <div class="sheet-list">${rows.join('')}</div>
+    ${bottle ? `<div class="sheet-actions"><button class="btn-primary" data-badge-bottle="${esc(bottle.id)}">View bottle</button></div>` : ''}`);
+}
+
+/* ── unlock banner queue ──
+   Items: { kind:'badge', id, i, total } | { kind:'more', ids } | { kind:'welcome', count }.
+   One banner at a time, 160 ms apart. Unlocks from a brew or merge wait until
+   #/result has settled; a save waits 300 ms. Nothing is dropped. */
+const bbLayer = $('#bbLayer');
+const BB = { queue: [], cur: null, peeks: [], holdForResult: false, notBefore: 0, welcomeAt: 0, gapUntil: 0, timer: 0, gate: 0, sheet: false };
+const sparkle = '<svg viewBox="0 0 24 24"><path d="M12 0c.8 6.4 5.6 11.2 12 12-6.4.8-11.2 5.6-12 12-.8-6.4-5.6-11.2-12-12C6.4 11.2 11.2 6.4 12 0Z"/></svg>';
+
+document.addEventListener('badges:unlock', e => {
+  if (!badgesOn()) return;
+  const ids = (e.detail && e.detail.ids) || [];
+  if (!ids.length) return;
+  ids.slice(0, 3).forEach((id, i) => BB.queue.push({ kind:'badge', id, i: i + 1, total: ids.length }));
+  if (ids.length > 3) BB.queue.push({ kind:'more', ids: ids.slice(3) });
+  if (e.detail.source === 'brew' || e.detail.source === 'merge') {
+    BB.holdForResult = true;
+    clearTimeout(BB.gate);
+    BB.gate = setTimeout(releaseResultHold, 1500);   // safety net if Result never opens
+  } else {
+    BB.notBefore = Math.max(BB.notBefore, performance.now() + 300);
+  }
+  refreshBadgeEntry();
+  pumpBanners();
+});
+
+document.addEventListener('badges:welcome', e => {
+  if (!badgesOn() || !(e.detail && e.detail.count > 0)) return;
+  BB.queue.unshift({ kind:'welcome', count: Number(e.detail.count) });
+  BB.welcomeAt = Infinity;
+  // 800 ms after the first paint that follows load
+  requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => { BB.welcomeAt = 0; pumpBanners(); }, 800)));
+});
+
+function releaseResultHold() {
+  clearTimeout(BB.gate);
+  if (!BB.holdForResult) return;
+  BB.holdForResult = false;
+  pumpBanners();
+}
+
+// Called by go(): the first banner starts on Result's transform transitionend + 240 ms (720 ms at most).
+function badgeRoute(name, el) {
+  if (name !== 'badges' && badgeSeenIO) { badgeSeenIO.disconnect(); badgeSeenIO = null; }
+  if (!BB.holdForResult) return;
+  clearTimeout(BB.gate);
+  if (name !== 'result') { BB.gate = setTimeout(releaseResultHold, 240); return; }
+  BB.gate = setTimeout(releaseResultHold, 720);
+  if (reducedMotion.matches) return;
+  const done = e => {
+    if (e.target !== el || e.propertyName !== 'transform') return;
+    el.removeEventListener('transitionend', done);
+    clearTimeout(BB.gate);
+    BB.gate = setTimeout(releaseResultHold, 240);
+  };
+  el.addEventListener('transitionend', done);
+}
+
+function refreshBadgeEntry() {
+  if (state.view === 'home') renderHomeBadges();
+  if (state.view === 'shelf') renderShelfBadges();
+  if (state.view === 'badges') renderBadges();
+}
+
+function pumpBanners() {
+  clearTimeout(BB.timer);
+  if (BB.cur || !BB.queue.length) return;
+  const head = BB.queue[0];
+  if (BB.sheet || (head.kind !== 'welcome' && BB.holdForResult)) { layoutPeeks(0, 0); return; }
+  const wait = Math.max(head.kind === 'welcome' ? BB.welcomeAt : BB.notBefore, BB.gapUntil) - performance.now();
+  if (wait === Infinity) return;
+  if (wait > 0) { BB.timer = setTimeout(pumpBanners, wait); return; }
+  showBanner(BB.queue.shift());
+}
+
+function bannerHTML(item) {
+  if (item.kind === 'welcome') {
+    const fan = topEarned(window.SodaBadges.getBadges(), 3);
+    return `<div class="bb-art">${badgeFan(fan, 40)}</div>
+      <div class="bb-text">
+        <div class="bb-eyebrow">Welcome back</div>
+        <div class="bb-name">You've already earned ${item.count} badge${item.count === 1 ? '' : 's'}</div>
+        <div class="bb-how">We counted the bottles on your shelf.</div>
+      </div>
+      <div class="bb-actions"><button class="bb-later" data-bb-close>Not now</button><button class="bb-go" data-bb-badges>View badges</button></div>`;
+  }
+  const chev = '<svg class="bb-chev" viewBox="0 0 10 10" width="10" height="10"><path d="m3.2 1.2 3.8 3.8-3.8 3.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  if (item.kind === 'more') {
+    const all = window.SodaBadges.getBadges();
+    const fan = item.ids.slice(0, 3).map(id => all.find(b => b.id === id)).filter(Boolean);
+    return `<div class="bb-art">${badgeFan(fan, 36)}</div>
+      <div class="bb-text">
+        <div class="bb-eyebrow">Badges unlocked</div>
+        <div class="bb-name">+${item.ids.length} more badge${item.ids.length === 1 ? '' : 's'}</div>
+        <div class="bb-how">Tap to see them all</div>
+      </div>${chev}`;
+  }
+  const b = getBadge(item.id);
+  const sparkles = tierRank(b.tier) >= tierRank('rare') ? [0, 1, 2].map(i => `<i class="bb-spark bb-spark--${i}">${sparkle}</i>`).join('') : '';
+  return `<div class="bb-art"><i class="bb-glow"></i><i class="bb-ring"></i>${b.tier === 'mythic' ? '<i class="bb-ring bb-ring--2"></i>' : ''}
+      <span class="bb-pop"><span class="bb-pop-in">${badgeImg(b, 52)}</span></span>${sparkles}</div>
+    <div class="bb-text">
+      <div class="bb-eyebrow">Badge unlocked<i></i><span class="bb-tier">${esc(b.tier)}</span></div>
+      <div class="bb-name">${esc(b.name)}</div>
+      <div class="bb-how">${esc(String(b.how).replace(/\.$/, ''))}</div>
+    </div>
+    ${item.total > 1 ? `<span class="bb-count">${item.i} of ${item.total}</span>` : ''}${chev}`;
+}
+
+const waitingBadges = () => BB.queue.filter(q => q.kind !== 'welcome').length;
+
+// Blank cards behind the front banner, nearest first, at slots from..from+n-1.
+function layoutPeeks(from, n) {
+  while (BB.peeks.length > n) BB.peeks.pop().remove();
+  while (BB.peeks.length < n) {
+    const p = document.createElement('div');
+    p.className = 'bb-peek';
+    p.dataset.slot = from + BB.peeks.length + 1;   // starts one slot further back, then steps in
+    bbLayer.prepend(p);
+    BB.peeks.push(p);
+  }
+  void bbLayer.offsetWidth;
+  BB.peeks.forEach((p, k) => { p.dataset.slot = from + k; });
+}
+
+function showBanner(item) {
+  const b = item.kind === 'badge' ? getBadge(item.id) : null;
+  if (item.kind === 'badge' && !b) { pumpBanners(); return; }
+  const el = document.createElement('div');
+  el.className = `bb bb--${item.kind}${b ? ' tier-' + b.tier : ''}`;
+  if (b) el.dataset.id = b.id;
+  el.setAttribute('role', item.kind === 'welcome' ? 'dialog' : 'button');
+  el.setAttribute('aria-label', item.kind === 'badge' ? `Badge unlocked: ${b.name}` : item.kind === 'more' ? `${item.ids.length} more badges unlocked` : 'Welcome back');
+  el.innerHTML = bannerHTML(item);
+  // the next banner takes the front peek's place instead of dropping in again
+  const front = BB.peeks[0] && BB.peeks[0].dataset.slot === '0' ? BB.peeks.shift() : null;
+  if (front) el.classList.add('is-from-peek');
+  bbLayer.append(el);
+  void el.offsetWidth;
+  el.classList.add('is-in');
+  if (front) front.remove();
+  layoutPeeks(1, item.kind === 'welcome' ? 0 : Math.min(2, waitingBadges()));
+
+  const hold = reducedMotion.matches ? 4000 : item.kind === 'welcome' ? 8000 : b && b.tier === 'mythic' ? 3000 : 2200;
+  // hold starts once the box is in; press or hover pauses it
+  const cur = BB.cur = { el, item, left: hold, at: 0, timer: 0, paused: 0, live: false, out: false };
+  const run = () => { if (cur.out || cur.paused) return; cur.at = performance.now(); cur.timer = setTimeout(() => exitBanner(cur), cur.left); };
+  const pause = () => { if (cur.paused++ || !cur.at) return; clearTimeout(cur.timer); cur.left -= performance.now() - cur.at; cur.at = 0; };
+  const resume = () => { if (!cur.paused || --cur.paused) return; if (cur.live) run(); };
+  setTimeout(() => { cur.live = true; run(); }, reducedMotion.matches ? 240 : 520);
+
+  let y0 = null, flicked = false;
+  el.addEventListener('pointerdown', e => { y0 = e.clientY; pause(); });
+  el.addEventListener('pointermove', e => {
+    if (y0 === null || flicked || e.clientY - y0 > -18) return;
+    flicked = true; exitBanner(cur, true);
+  });
+  const up = () => { if (y0 !== null) { y0 = null; resume(); } };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  if (matchMedia('(hover: hover)').matches) { el.addEventListener('pointerenter', pause); el.addEventListener('pointerleave', resume); }
+  el.addEventListener('click', e => {
+    if (flicked) return;
+    if (e.target.closest('[data-bb-close]')) { exitBanner(cur); return; }
+    if (e.target.closest('[data-bb-badges]') || item.kind === 'more') { exitBanner(cur); if (state.view !== 'badges') go('badges', 'push'); return; }
+    if (item.kind === 'badge') {
+      exitBanner(cur);
+      layoutPeeks(0, 0);
+      BB.sheet = true;     // the queue waits for the sheet, then resumes 400 ms after it closes
+      openBadgeSheet(item.id);
+      new MutationObserver((_, mo) => {
+        if (!sheetLayer.hidden) return;
+        mo.disconnect();
+        BB.sheet = false;
+        BB.gapUntil = Math.max(BB.gapUntil, performance.now() + 400);
+        pumpBanners();
+      }).observe(sheetLayer, { attributes: true, attributeFilter: ['hidden'] });
+    }
+  });
+}
+
+function exitBanner(cur, fast) {
+  if (cur.out) return;
+  cur.out = true;
+  clearTimeout(cur.timer);
+  const el = cur.el;
+  el.classList.add(fast ? 'is-flick' : 'is-out');
+  // the waiting peeks step forward while the front leaves
+  const next = cur.item.kind === 'welcome' || BB.queue[0]?.kind === 'welcome' ? 0 : waitingBadges();
+  layoutPeeks(0, next ? 1 + Math.min(2, next - 1) : 0);
+  const ms = reducedMotion.matches ? 240 : fast ? 240 : 360;
+  afterTransition(el, ms + 200, () => {
+    el.remove();
+    if (BB.cur === cur) BB.cur = null;
+    BB.gapUntil = performance.now() + 160;
+    pumpBanners();
+  });
+}
+
 /* ───────────── toast ───────────── */
 
 let toastTimer = null;
@@ -1868,6 +2221,12 @@ document.addEventListener('click', e => {
 
   const flavorRow = t.closest('[data-flavor]');
   if (flavorRow) { openFlavorSheet(flavorRow.dataset.flavor); return; }
+
+  const badgeEl = t.closest('[data-badge]');
+  if (badgeEl) { openBadgeSheet(badgeEl.dataset.badge); return; }
+
+  const badgeBottle = t.closest('[data-badge-bottle]');
+  if (badgeBottle) { closeSheet(() => openBatchSheet(badgeBottle.dataset.badgeBottle)); return; }
 
   const batchEl = t.closest('[data-batch]');
   if (batchEl) { openBatchSheet(batchEl.dataset.batch); return; }
@@ -1982,6 +2341,7 @@ $('#flavorSearch').addEventListener('input', e => {
 // keyboard niceties
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
+  if (state.view === 'badges' && !overlayOpen()) badgesBack();
   if (sheetLayer.classList.contains('is-open')) closeSheet();
   const deco = $('#decoLayer');
   if (deco && deco.classList.contains('is-open')) cancelDeco();
@@ -2012,8 +2372,8 @@ function demoSeed() {
 }
 
 function bootRoute() {
-  const m = location.hash.match(/^#\/(home|shelf|flavors|mix|result)\b/);
-  if (!m) return false;
+  const m = location.hash.match(VIEW_RE);
+  if (!m || (m[1] === 'badges' && !badgesOn())) return false;
   const v = m[1];
 
   if (v === 'result') {

@@ -15,6 +15,11 @@ const SHELL = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/maskable-512.png',
+  './icons/badges/mystery.svg',
+  ...['first-pour', 'shelf-starter', 'lab-regular', 'full-glass', 'dressed-up', 'fully-charmed', 'encore',
+    'lucky-pour', 'epic-find', 'legend-in-a-bottle', 'mythic', 'base-tour', 'pantry-explorer',
+    'secret-recipe', 'combo-hunter', 'fusion', 'family-tree', 'flavor-of-the-day']
+    .flatMap(id => [`./icons/badges/${id}.svg`, `./icons/badges/${id}-locked.svg`]),
 ];
 
 self.addEventListener('install', e => {

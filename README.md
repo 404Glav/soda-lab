@@ -12,7 +12,8 @@ SodaLab/
 ├── app.js         flavor data, color blending, bottle renderer, router
 ├── manifest.json  installable / standalone metadata
 ├── sw.js          cache-first offline shell (bump CACHE when files change)
-└── icons/         favicons (ico, 16, 32), apple-touch 180, PWA 192/512 + maskable 512
+└── icons/         favicons (ico, 16, 32), apple-touch 180, PWA 192/512 + maskable 512;
+                   badges/ holds Pixel's badge caps (<id>.svg, <id>-locked.svg, mystery.svg)
 ```
 
 ## Run it

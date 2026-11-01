@@ -1462,3 +1462,10 @@ body.has-sheet .toast.is-show { transform: translate(-50%, 0); }
 }
 .chain-row.is-lifted { box-shadow: 0 14px 30px -10px rgba(20,18,14,.35); }
 .pedal.is-lifted .pedal-art { filter: drop-shadow(0 12px 16px rgba(20,18,14,.3)); }
+
+/* pads header: edit + chop */
+.head-btns { display: flex; gap: 8px; }
+
+/* full chain */
+.pick-card:disabled { opacity: .42; cursor: not-allowed; }
+.pick-card:disabled:active { transform: none; }

@@ -1146,12 +1146,13 @@ function wireReorder(host, opts) {
 
 function openPedalPicker() {
   S.sheet = { kind: 'picker' };
+  const full = S.chain.length >= 6;
   const body = $('#sheetBody');
   body.innerHTML = `
     <div class="sheet-head">
       <div>
         <div class="sheet-title">Add a pedal</div>
-        <div class="sheet-note">The chain holds up to six.</div>
+        <div class="sheet-note">${full ? 'The chain is full. Remove a pedal to add another.' : 'The chain holds up to six.'}</div>
       </div>
       <button class="sheet-close" data-close-sheet aria-label="Close">
         <svg viewBox="0 0 24 24" width="14" height="14"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
@@ -1159,7 +1160,7 @@ function openPedalPicker() {
     </div>
     <div class="pick-grid">
       ${PEDAL_TYPES.map((type) => `
-        <button class="pick-card" data-pick="${type}">
+        <button class="pick-card" data-pick="${type}"${full ? ' disabled' : ''}>
           <div class="pick-art">${pedalSVG(type)}</div>
           <div>
             <div class="pick-name">${esc(pedalName(type))}</div>
@@ -2188,6 +2189,7 @@ function wirePadInput() {
     if (event.button) return;
     const index = Number(el.dataset.pad);
     if (Number.isNaN(index)) return;
+    if (S.padEdit) { event.preventDefault(); openPadSheet(index); return; }
     padPress = { el, index, x: event.clientX, y: event.clientY };
     el.classList.add('is-on');
     wake();
@@ -2240,6 +2242,18 @@ function wireStatic() {
   on('#chainAdd', 'click', openPedalPicker);
   on('#chainEmptyAdd', 'click', openPedalPicker);
   on('#padsChop', 'click', () => doChop('find'));
+  on('#padsEdit', 'click', () => {
+    S.padEdit = !S.padEdit;
+    const btn = $('#padsEdit');
+    btn.classList.toggle('icon-btn--dark', S.padEdit);
+    btn.setAttribute('aria-pressed', String(S.padEdit));
+    const note = $('#padsNote');
+    if (note) {
+      note.textContent = S.padEdit
+        ? 'Edit is on: tap a pad to change it. Tap the pencil again to play.'
+        : 'Tap to play. Hold a pad, press E, or turn on the pencil to edit it. Gold star = favorite.';
+    }
+  });
   on('#resumeBtn', 'click', () => {
     wake().then(() => { if (E.state === 'running') toast('Sound is back', 1200); });
   });
@@ -2304,10 +2318,15 @@ function wireStatic() {
     }
     const target = event.target;
     if (!target || !target.classList || !target.classList.contains('pad')) return;
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
     const index = Number(target.dataset.pad);
     if (Number.isNaN(index)) return;
+    if (event.key === 'e' || event.key === 'E' || (S.padEdit && event.key === 'Enter')) {
+      event.preventDefault();
+      openPadSheet(index);
+      return;
+    }
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
     wake();
     E.trigger(index);
     target.classList.add('is-on');

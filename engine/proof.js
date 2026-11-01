@@ -85,11 +85,11 @@ export async function runProof(options) {
   await SoundEngine.loadFile(helloFile);
   SoundEngine.setLoop(0, 0);
 
-  const wet = await SoundEngine.bake({ seed: SoundEngine._seed(), what: 'region' });
+  const wet = await SoundEngine.bake({ seed: SoundEngine._seed(), what: 'region', tail: false });
   const wetBuf = await channelsOf(wet.id);
   SoundEngine.setKnob(prism, 'mix', 0);
   await sleep(120);
-  const dry = await SoundEngine.bake({ seed: SoundEngine._seed(), what: 'region' });
+  const dry = await SoundEngine.bake({ seed: SoundEngine._seed(), what: 'region', tail: false });
   const dryBuf = await channelsOf(dry.id);
   SoundEngine.setKnob(prism, 'mix', 0.5);
   await sleep(80);
@@ -125,11 +125,11 @@ export async function runProof(options) {
   SoundEngine.setKnob(prism, 'shape', 0.15);
   SoundEngine.setKnob(prism, 'density', 0);
   await sleep(120);
-  const sparse = await SoundEngine.bake({ seed: 7, what: 'region' });
+  const sparse = await SoundEngine.bake({ seed: 7, what: 'region', tail: false });
   const sparseCh = await channelsOf(sparse.id);
   SoundEngine.setKnob(prism, 'density', 1);
   await sleep(120);
-  const dense = await SoundEngine.bake({ seed: 7, what: 'region' });
+  const dense = await SoundEngine.bake({ seed: 7, what: 'region', tail: false });
   const denseCh = await channelsOf(dense.id);
   const sparseHits = countBursts(sparseCh.left, sr);
   const denseHits = countBursts(denseCh.left, sr);
@@ -149,11 +149,11 @@ export async function runProof(options) {
   SoundEngine.setKnob(prism, 'repeats', 0.55);
   SoundEngine.setKnob(prism, 'space', 0);
   await sleep(150);
-  const space0 = await SoundEngine.bake({ seed: 11, what: 'region' });
+  const space0 = await SoundEngine.bake({ seed: 11, what: 'region', tail: false });
   const s0 = await channelsOf(space0.id);
   SoundEngine.setKnob(prism, 'space', 1);
   await sleep(150);
-  const space1 = await SoundEngine.bake({ seed: 11, what: 'region' });
+  const space1 = await SoundEngine.bake({ seed: 11, what: 'region', tail: false });
   const s1 = await channelsOf(space1.id);
   const nullWin = Math.floor(0.03 * sr);
   const nullDb = diffDb(s0.left, s1.left, 0, nullWin);
@@ -176,20 +176,20 @@ export async function runProof(options) {
   SoundEngine.setKnob(prism, 'mix', 0);
   SoundEngine.setKnob(prism, 'tone', 0);
   await sleep(120);
-  const toneDryA = await channelsOf((await SoundEngine.bake({ seed: 3, what: 'region' })).id);
+  const toneDryA = await channelsOf((await SoundEngine.bake({ seed: 3, what: 'region', tail: false })).id);
   SoundEngine.setKnob(prism, 'tone', 1);
   await sleep(80);
-  const toneDryB = await channelsOf((await SoundEngine.bake({ seed: 3, what: 'region' })).id);
+  const toneDryB = await channelsOf((await SoundEngine.bake({ seed: 3, what: 'region', tail: false })).id);
   const dryNull = diffDb(toneDryA.left, toneDryB.left, 0, Math.min(toneDryA.left.length, toneDryB.left.length));
   SoundEngine.setKnob(prism, 'mix', 1);
   SoundEngine.setKnob(prism, 'density', 0.85);
   SoundEngine.setKnob(prism, 'time', 0.5);
   SoundEngine.setKnob(prism, 'tone', 0);
   await sleep(120);
-  const dark = await channelsOf((await SoundEngine.bake({ seed: 3, what: 'region' })).id);
+  const dark = await channelsOf((await SoundEngine.bake({ seed: 3, what: 'region', tail: false })).id);
   SoundEngine.setKnob(prism, 'tone', 1);
   await sleep(120);
-  const bright = await channelsOf((await SoundEngine.bake({ seed: 3, what: 'region' })).id);
+  const bright = await channelsOf((await SoundEngine.bake({ seed: 3, what: 'region', tail: false })).id);
   const hfDark = band(fftMag(dark.left), sr, 7000, 14000);
   const hfBright = band(fftMag(bright.left), sr, 7000, 14000);
   say('tone dry null dB ' + dryNull.toFixed(1) + ' hf dark ' + hfDark.toFixed(3) + ' bright ' + hfBright.toFixed(3));
@@ -214,7 +214,7 @@ export async function runProof(options) {
   const liveStream = await SoundEngine._tap('stream', 'stop');
   const liveDirect = await SoundEngine._tap('direct', 'stop');
   SoundEngine.stop();
-  const baked = await SoundEngine.bake({ seed: SoundEngine._seed(), what: 'region' });
+  const baked = await SoundEngine.bake({ seed: SoundEngine._seed(), what: 'region', tail: false });
   const bakeCh = await channelsOf(baked.id);
   const streamCmp = liveStream && liveStream.left ? compareLive(bakeCh.left, liveStream.left, sr) : { db: null, error: 'no stream' };
   const directCmp = liveDirect && liveDirect.left ? compareLive(bakeCh.left, liveDirect.left, sr) : { db: null, error: 'no direct' };
@@ -232,7 +232,7 @@ export async function runProof(options) {
   const phaseA = SoundEngine.curvePhase(prism);
   await sleep(180);
   const phaseB = SoundEngine.curvePhase(prism);
-  const curved = await SoundEngine.bake({ seed: 5, what: 'region' });
+  const curved = await SoundEngine.bake({ seed: 5, what: 'region', tail: false });
   SoundEngine.setCurve(prism, null);
   say('curve phase ' + phaseA.toFixed(3) + ' -> ' + phaseB.toFixed(3));
   out.checks.curve = { phaseA, phaseB, moved: Math.abs(phaseB - phaseA) > 0.01, bakeId: curved.id };
@@ -275,13 +275,13 @@ export async function runProof(options) {
   SoundEngine.setLoop(0, 0.1);
   SoundEngine.setLoopEnabled(false);
   SoundEngine.setKnob(SoundEngine.getChain()[0].id, 'mix', 0.1);
-  await SoundEngine.loadProject(savedId);
+  const loaded = await SoundEngine.loadProject(savedId);
   const restored = SoundEngine.getChain()[0];
   const projects = await SoundEngine.listProjects();
   const listed = projects.filter((row) => row.id === savedId)[0];
   const sources = await SoundEngine.listSources();
   const reloaded = await SoundEngine.loadSource(sources[0].id);
-  const linked = await SoundEngine.bake({ what: 'region', seed: 1 });
+  const linked = await SoundEngine.bake({ what: 'region', tail: false, seed: 1 });
   const bakes = await SoundEngine.listBakes();
   const projectsAfter = await SoundEngine.listProjects();
   const listedAfter = projectsAfter.filter((row) => row.id === savedId)[0];
@@ -300,7 +300,16 @@ export async function runProof(options) {
     restoredBpm: reloaded && reloaded.bpm,
     restoredKey: reloaded && reloaded.key,
     isPlaying: SoundEngine.isPlaying(),
+    loadProjectKeys: loaded && typeof loaded === 'object' ? Object.keys(loaded) : typeof loaded,
+    getSourceId: SoundEngine.getSource() && SoundEngine.getSource().id,
   };
+  const attached = (await SoundEngine.listBakes()).find((row) => row.id === wet.id);
+  out.checks.bakeAttach = {
+    projectId: attached && attached.projectId,
+    matchesSave: !!(attached && attached.projectId === savedId),
+    bakeCount: listedAfter && listedAfter.bakeCount,
+  };
+  say('bake attach ' + (attached && attached.projectId) + ' count ' + (listedAfter && listedAfter.bakeCount));
   out.checks.deletes = await checkDeletes(say, savedId, reloaded.id, linked.id);
 
   const chainFullErrors = [];
@@ -330,6 +339,8 @@ export async function runProof(options) {
     say('mic failed ' + out.checks.mic.error);
   }
 
+  out.checks.transport = await checkTransportReset(say, sr);
+  out.checks.tails = await checkTails(say, sr);
   if (!options.skipStress) {
     out.checks.stress = await stress(say, sr);
   } else {
@@ -792,6 +803,75 @@ function read24(view, offset) {
   return n / 0x800000;
 }
 
+async function checkTransportReset(say, rate) {
+  const long = new Float32Array(Math.floor(rate * 2));
+  const short = new Float32Array(Math.floor(rate * 1));
+  for (let i = 0; i < long.length; i++) long[i] = Math.sin((2 * Math.PI * 220 * i) / rate) * 0.2;
+  for (let i = 0; i < short.length; i++) short[i] = Math.sin((2 * Math.PI * 880 * i) / rate) * 0.2;
+  await SoundEngine.loadFile(new File([encodeWav16([long, long], rate)], 'long.wav', { type: 'audio/wav' }));
+  SoundEngine.setLoop(0, 2);
+  SoundEngine.setLoopEnabled(true);
+  await SoundEngine.seek(0);
+  await SoundEngine.play();
+  await sleep(250);
+  const during = SoundEngine.isPlaying();
+  const next = await SoundEngine.loadFile(new File([encodeWav16([short, short], rate)], 'short.wav', { type: 'audio/wav' }));
+  await sleep(50);
+  const after = {
+    isPlaying: SoundEngine.isPlaying(),
+    position: SoundEngine.position(),
+    duration: next.duration,
+    loop: SoundEngine.getLoop(),
+  };
+  const viaSource = await SoundEngine.loadSource(next.id);
+  const afterSource = { isPlaying: SoundEngine.isPlaying(), position: SoundEngine.position(), loop: SoundEngine.getLoop(), duration: viaSource.duration };
+  const bk = await SoundEngine.bake({ what: 'region', tail: false, seed: 1 });
+  await SoundEngine.play();
+  await sleep(80);
+  const viaBake = await SoundEngine.loadBake(bk.id);
+  const afterBake = { isPlaying: SoundEngine.isPlaying(), position: SoundEngine.position(), loop: SoundEngine.getLoop(), duration: viaBake.duration };
+  say('mid-play load playing ' + after.isPlaying + ' pos ' + after.position.toFixed(3) + ' loop ' + JSON.stringify(after.loop));
+  return { during, after, afterSource, afterBake };
+}
+
+async function checkTails(say, rate) {
+  const n = Math.floor(rate * 0.5);
+  const tone = new Float32Array(n);
+  for (let i = 0; i < n; i++) tone[i] = Math.sin((2 * Math.PI * 330 * i) / rate) * 0.4;
+  await SoundEngine.loadFile(new File([encodeWav16([tone, tone], rate)], 'tail.wav', { type: 'audio/wav' }));
+  await clearChain();
+  SoundEngine.setLoop(0, 0);
+  SoundEngine.setLoopEnabled(false);
+  const dryTail = await SoundEngine.bake({ what: 'region', seed: 4 });
+  const dryExact = await SoundEngine.bake({ what: 'region', seed: 4, tail: false });
+  const dryCh = await channelsOf(dryTail.id);
+  const dryEx = await channelsOf(dryExact.id);
+  let regionErr = 0;
+  let regionRef = 0;
+  const frames = Math.min(dryEx.left.length, dryCh.left.length);
+  for (let i = 0; i < frames; i++) {
+    const d = dryCh.left[i] - dryEx.left[i];
+    regionErr += d * d;
+    regionRef += dryEx.left[i] * dryEx.left[i];
+  }
+  const regionDb = 20 * Math.log10((Math.sqrt(regionErr / frames) + 1e-12) / (Math.sqrt(regionRef / frames) + 1e-12));
+  const id = SoundEngine.addPedal('cathedral');
+  SoundEngine.setKnob(id, 'size', 1);
+  SoundEngine.setKnob(id, 'mix', 0.8);
+  SoundEngine.setKnob(id, 'predelay', 0);
+  SoundEngine.setKnob(id, 'damping', 0.2);
+  const huge = await SoundEngine.bake({ what: 'region', seed: 4 });
+  say('tails dry ' + dryTail.duration.toFixed(3) + ' exact ' + dryExact.duration.toFixed(3) + ' huge ' + huge.duration.toFixed(3) + ' regionDb ' + regionDb.toFixed(1));
+  return {
+    dry: dryTail.duration,
+    exact: dryExact.duration,
+    huge: huge.duration,
+    dryExtra: dryTail.duration - dryExact.duration,
+    hugeExtra: huge.duration - dryExact.duration,
+    regionDb,
+  };
+}
+
 async function measureTrigger(say) {
   SoundEngine._takeHits();
   const audio = SoundEngine._context();
@@ -839,7 +919,7 @@ async function checkSweepCurve(say, rate) {
   await sleep(2300);
   const live = await SoundEngine._tap('stream', 'stop');
   SoundEngine.stop();
-  const baked = await SoundEngine.bake({ seed: SoundEngine._seed(), what: 'region' });
+  const baked = await SoundEngine.bake({ seed: SoundEngine._seed(), what: 'region', tail: false });
   const bakeCh = await channelsOf(baked.id);
   const cmp = live && live.left ? compareLive(bakeCh.left, live.left, rate) : { db: null };
   const earlyN = Math.floor(0.35 * rate);

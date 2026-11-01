@@ -36,6 +36,7 @@ let startedAt = 0;
 let startOffset = 0;
 let sourceNode = null;
 let projectId = null;
+const unownedBakes = new Set();
 let meterTimer = 0;
 let micStream = null;
 let micNode = null;
@@ -231,7 +232,7 @@ function runAnalyze(samples, sampleRate) {
   });
 }
 
-async function adopt(rec) {
+async function adopt(rec, savedLoop) {
   let left = rec.left;
   let right = rec.right;
   let sampleRate = rec.sampleRate;
@@ -257,6 +258,66 @@ async function adopt(rec) {
   };
   if (toneCtx) {
     try { getTransport().bpm.value = tempo(); } catch { /* transport not ready */ }
+  }
+  settleTransport(current.duration, savedLoop || null);
+}
+
+const TAIL_THRESHOLD = Math.pow(10, -60 / 20);
+const TAIL_HOLD_SEC = 0.1;
+const TAIL_MAX_SEC = 10;
+
+function trimTail(left, right, regionFrames, sampleRate) {
+  const hold = Math.max(1, Math.round(TAIL_HOLD_SEC * sampleRate));
+  const limit = Math.min(left.length, regionFrames + Math.round(TAIL_MAX_SEC * sampleRate));
+  let quiet = 0;
+  let cut = limit;
+  const start = Math.max(0, Math.min(regionFrames, left.length));
+  for (let i = start; i < limit; i++) {
+    const a = left[i] < 0 ? -left[i] : left[i];
+    const b = right[i] < 0 ? -right[i] : right[i];
+    if (a < TAIL_THRESHOLD && b < TAIL_THRESHOLD) {
+      quiet++;
+      if (quiet >= hold) {
+        cut = i + 1;
+        break;
+      }
+    } else {
+      quiet = 0;
+    }
+  }
+  if (cut >= left.length) {
+    return { left: left.slice(), right: right.slice() };
+  }
+  return { left: left.slice(0, cut), right: right.slice(0, cut) };
+}
+
+async function claimUnownedBakes(ownerId) {
+  const ids = Array.from(unownedBakes);
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    const rec = bakes.get(id) || await idbGet('bakes', id);
+    if (!rec || rec.projectId) continue;
+    rec.projectId = ownerId;
+    await idbPut('bakes', rec);
+    bakes.set(id, rec);
+  }
+  unownedBakes.clear();
+}
+
+function settleTransport(duration, savedLoop) {
+  halt();
+  playing = false;
+  playhead = 0;
+  startedAt = 0;
+  startOffset = 0;
+  try { if (toneCtx) getTransport().pause(); } catch { /* no clock yet */ }
+  if (savedLoop) {
+    loopStart = Math.max(0, Number(savedLoop.start) || 0);
+    loopEnd = Math.max(loopStart, Number(savedLoop.end) || 0);
+    loopEnabled = !!savedLoop.enabled;
+  } else {
+    loopStart = 0;
+    loopEnd = Math.max(0, Number(duration) || 0);
   }
 }
 
@@ -512,6 +573,8 @@ const api = {
     syncState();
   },
   async loadFile(file) {
+    halt();
+    playing = false;
     if (file && file.size > MAX_BYTES) throw fail('too_large', 'Audio is over 50 MB.');
     let bytes;
     try {
@@ -573,10 +636,15 @@ const api = {
     })).sort((a, b) => (a.added < b.added ? 1 : -1));
   },
   async loadSource(id) {
+    halt();
+    playing = false;
     const rec = await idbGet('sources', id);
     if (!rec) throw new Error('Unknown source.');
     await adopt(rec);
     return viewSource(current);
+  },
+  getSource() {
+    return current ? viewSource(current) : null;
   },
   setBpm(value) {
     const n = Number(value);
@@ -909,6 +977,7 @@ const api = {
     const options = opts || {};
     if (options.seed != null) seed = options.seed >>> 0;
     const what = options.what || 'region';
+    const withTail = options.tail !== false;
     const sr = current ? current.sampleRate : (ctx ? ctx.sampleRate : 48000);
     let left;
     let right;
@@ -932,9 +1001,11 @@ const api = {
       duration = left.length / sr;
     }
     const regionStart = what !== 'pads' && loopEnd > loopStart ? loopStart : 0;
+    const regionFrames = left.length;
+    const renderDuration = withTail ? duration + 10 : duration;
     const rendered = await renderOffline({
       sampleRate: sr,
-      duration,
+      duration: renderDuration,
       left,
       right,
       chain: api.getChain(),
@@ -945,11 +1016,19 @@ const api = {
       loop: loopState(),
       onProgress: (value) => emit('progress', value),
     });
-    const outL = rendered.buffer.getChannelData(0).slice();
-    const outR = rendered.buffer.numberOfChannels > 1
-      ? rendered.buffer.getChannelData(1).slice()
-      : outL.slice();
+    let outL = rendered.buffer.getChannelData(0);
+    let outR = rendered.buffer.numberOfChannels > 1 ? rendered.buffer.getChannelData(1) : outL;
+    if (withTail) {
+      const trimmed = trimTail(outL, outR, regionFrames, rendered.buffer.sampleRate);
+      outL = trimmed.left;
+      outR = trimmed.right;
+    } else {
+      const n = Math.min(regionFrames, outL.length);
+      outL = outL.slice(0, n);
+      outR = outR.slice(0, n);
+    }
     const id = uid('bake');
+    if (!projectId) unownedBakes.add(id);
     const rec = {
       id,
       projectId,
@@ -978,6 +1057,8 @@ const api = {
     return encodeWav24(rec.left, rec.right, rec.sampleRate);
   },
   async loadBake(bakeId) {
+    halt();
+    playing = false;
     const rec = bakes.get(bakeId) || await idbGet('bakes', bakeId);
     if (!rec) throw new Error('Unknown bake.');
     bakes.set(bakeId, rec);
@@ -1010,6 +1091,7 @@ const api = {
     };
     try {
       await idbPut('projects', rec);
+      await claimUnownedBakes(projectId);
     } catch (err) {
       if (err && err.code === 'storage_full') throw fail('storage_full', 'Storage is full.');
       throw err;
@@ -1027,20 +1109,27 @@ const api = {
     })).sort((a, b) => (a.updated < b.updated ? 1 : -1));
   },
   async loadProject(id) {
+    halt();
+    playing = false;
     const rec = await idbGet('projects', id);
     if (!rec) throw new Error('Unknown project.');
     projectId = rec.id;
     if (rec.seed) seed = rec.seed;
-    loopStart = rec.loop ? Number(rec.loop.start) || 0 : 0;
-    loopEnd = rec.loop ? Number(rec.loop.end) || 0 : 0;
-    loopEnabled = !!(rec.loop && rec.loop.enabled);
+    const savedLoop = rec.loop ? {
+      start: Number(rec.loop.start) || 0,
+      end: Number(rec.loop.end) || 0,
+      enabled: !!rec.loop.enabled,
+    } : { start: 0, end: 0, enabled: false };
     if (Object.prototype.hasOwnProperty.call(rec, 'bpmOverride')) bpmOverride = rec.bpmOverride;
     else bpmOverride = rec.bpm == null ? null : rec.bpm;
     if (Object.prototype.hasOwnProperty.call(rec, 'keyOverride')) keyOverride = rec.keyOverride;
     else keyOverride = rec.key == null ? null : rec.key;
     if (rec.sourceId) {
       const src = await idbGet('sources', rec.sourceId);
-      if (src) await adopt(src);
+      if (src) await adopt(src, savedLoop);
+      else settleTransport(0, savedLoop);
+    } else {
+      settleTransport(current ? current.duration : 0, savedLoop);
     }
     batch = true;
     if (graph) {
@@ -1104,7 +1193,7 @@ const api = {
     scheduleLiveCurves();
     emit('chain', api.getChain());
     emit('pads', viewPads());
-    return projectId;
+    return current ? viewSource(current) : null;
   },
   async deleteProject(id) {
     const rec = await idbGet('projects', id);

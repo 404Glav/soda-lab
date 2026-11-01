@@ -29,6 +29,7 @@ const SHELL = [
   './engine/worklets/glitch-processor.js',
   './engine/worklets/pad-processor.js',
   './engine/worklets/prism-processor.js',
+  './engine/worklets/limiter-processor.js',
   './engine/vendor/tone/index.js',
   './engine/vendor/tone/Tone.js',
   './engine/vendor/signalsmith-stretch/SignalsmithStretch.js',

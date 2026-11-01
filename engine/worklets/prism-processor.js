@@ -62,6 +62,10 @@ class PrismProcessor extends AudioWorkletProcessor {
     this.absWrite = 0;
     this.frozenHistory = 0;
     this.holding = false;
+    this.prevFreeze = false;
+    this.freezeLatch = false;
+    this.freezeArm = false;
+    this.freezeFill = 0;
     this.prevL = 0;
     this.prevR = 0;
     this.fbScale = 0;
@@ -97,6 +101,10 @@ class PrismProcessor extends AudioWorkletProcessor {
     this.absWrite = 0;
     this.frozenHistory = 0;
     this.holding = false;
+    this.prevFreeze = false;
+    this.freezeLatch = false;
+    this.freezeArm = false;
+    this.freezeFill = 0;
     this.prevL = 0;
     this.prevR = 0;
     this.wait = 1;
@@ -175,6 +183,12 @@ class PrismProcessor extends AudioWorkletProcessor {
     this.spawns++;
   }
 
+  latchFreeze() {
+    this.freezeLatch = true;
+    this.holding = true;
+    this.frozenHistory = Math.max(16, Math.min(this.absWrite, this.length - 8));
+  }
+
   process(inputs, outputs, params) {
     const input = inputs[0] || [];
     const output = outputs[0];
@@ -204,19 +218,39 @@ class PrismProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < n; i++) {
       const inSampleL = inL[i] || 0;
       const inSampleR = inR[i] || 0;
-      const incoming = Math.abs(inSampleL) + Math.abs(inSampleR) > 1e-5;
-      const capturing = !freeze || incoming;
-      if (capturing) {
-        const scale = freeze ? 0 : (this.fbScale || 0);
+      const freezeOn = freeze;
+      const rising = freezeOn && !this.prevFreeze;
+      const falling = !freezeOn && this.prevFreeze;
+      this.prevFreeze = freezeOn;
+      if (falling) {
+        this.freezeLatch = false;
+        this.freezeArm = false;
+        this.freezeFill = 0;
+        this.holding = false;
+      }
+      if (rising && this.absWrite > sampleRate * 0.05) this.latchFreeze();
+      let writeNow = !freezeOn;
+      let lockAfter = false;
+      if (freezeOn && !this.freezeLatch) {
+        // Freeze was already on before any audio arrived. Record one opening
+        // window, then lock. This is not a gate that stays open for a tail.
+        if (Math.abs(inSampleL) + Math.abs(inSampleR) > 1e-4) this.freezeArm = true;
+        if (this.freezeArm) {
+          writeNow = true;
+          this.freezeFill++;
+          const need = Math.max(grainSec * sampleRate, sampleRate * 0.2);
+          if (this.freezeFill >= Math.min(this.length - 16, need)) lockAfter = true;
+        }
+      }
+      if (writeNow) {
+        const scale = freezeOn ? 0 : (this.fbScale || 0);
         const slot = this.absWrite % this.length;
         this.bufL[slot] = inSampleL + this.prevL * scale;
         this.bufR[slot] = inSampleR + this.prevR * scale;
         this.write = slot;
         this.absWrite++;
         this.holding = false;
-      } else if (!this.holding) {
-        this.frozenHistory = Math.max(16, Math.min(this.absWrite, this.length - 8));
-        this.holding = true;
+        if (lockAfter) this.latchFreeze();
       }
       const history = this.holding
         ? this.frozenHistory

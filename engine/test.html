@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="icon" href="data:,">
+  <title>Sound Lab engine test</title>
+</head>
+<body>
+  <h1>Sound Lab engine</h1>
+  <p id="state">idle</p>
+  <p id="meter">meter</p>
+  <p>
+    <button id="start" type="button">Start</button>
+    <button id="stop" type="button">Stop</button>
+    <button id="play" type="button">Play</button>
+    <button id="seek0" type="button">Seek 0</button>
+    <button id="playing" type="button">Is playing?</button>
+    <button id="loop" type="button">Loop 0–2</button>
+    <button id="looptoggle" type="button">Toggle loop</button>
+  </p>
+  <p>
+    <input id="file" type="file" accept="audio/*,.wav,.mp3,.m4a">
+    <button id="rec" type="button">Record mic</button>
+    <button id="recstop" type="button">Stop mic</button>
+  </p>
+  <p>
+    <button type="button" data-add="prism">Add prism</button>
+    <button type="button" data-add="reel">Add reel</button>
+    <button type="button" data-add="cathedral">Add cathedral</button>
+    <button type="button" data-add="fizz">Add fizz</button>
+    <button type="button" data-add="crusher">Add crusher</button>
+    <button type="button" data-add="sweep">Add sweep</button>
+  </p>
+  <p>
+    <button id="bypass" type="button">Bypass selected</button>
+    <button id="remove" type="button">Remove selected</button>
+    <label>Move to <input id="move" type="number" min="0" max="5" value="0"></label>
+    <button id="domove" type="button">Move</button>
+  </p>
+  <div id="knobs"></div>
+  <p>
+    <button type="button" data-curve="ramp">Curve ramp</button>
+    <button type="button" data-curve="saw">Curve saw</button>
+    <button type="button" data-curve="square">Curve square</button>
+    <button type="button" data-curve="triangle">Curve triangle</button>
+    <button type="button" data-curve="pump">Curve pump</button>
+    <button id="clearcurve" type="button">Clear curve</button>
+    <span id="phase"></span>
+  </p>
+  <p>
+    <button id="find" type="button">Chop find</button>
+    <button id="slice" type="button">Chop slice</button>
+    <button id="random" type="button">Chop random</button>
+    <button id="fav" type="button">Favorite pad 0</button>
+  </p>
+  <div id="pads"></div>
+  <p>
+    <button id="bake" type="button">Bake region</button>
+    <button id="bakepads" type="button">Bake pads</button>
+    <button id="wav" type="button">Export WAV</button>
+    <button id="save" type="button">Save project</button>
+    <button id="load" type="button">Load last project</button>
+    <button id="delbake" type="button">Delete last bake</button>
+    <button id="delproj" type="button">Delete last project</button>
+    <button id="proof" type="button">Run proof</button>
+  </p>
+  <pre id="log"></pre>
+  <script>
+    window.__errors = [];
+    window.addEventListener('error', function (event) {
+      window.__errors.push(String(event.message || event.error || 'error'));
+    });
+    window.addEventListener('unhandledrejection', function (event) {
+      window.__errors.push(String(event.reason && event.reason.message || event.reason || 'rejection'));
+    });
+    var orig = console.error;
+    console.error = function () {
+      var text = Array.prototype.join.call(arguments, ' ');
+      window.__errors.push(text);
+      return orig.apply(console, arguments);
+    };
+  </script>
+  <script type="module">
+    import { SoundEngine } from './index.js';
+    import { runProof } from './proof.js';
+
+    const logEl = document.getElementById('log');
+    const stateEl = document.getElementById('state');
+    const meterEl = document.getElementById('meter');
+    const knobEl = document.getElementById('knobs');
+    const padEl = document.getElementById('pads');
+    let selected = null;
+    let lastProject = null;
+    let lastBake = null;
+
+    function log(line) {
+      logEl.textContent += line + '\n';
+    }
+
+    SoundEngine.on('state', (value) => { stateEl.textContent = value; log('state ' + value); });
+    SoundEngine.on('error', (err) => log('error ' + err.code + ' ' + err.message));
+    SoundEngine.on('meter', (m) => {
+      meterEl.textContent = m.l.toFixed(1) + ' / ' + m.r.toFixed(1) + ' gr ' + m.gr.toFixed(2);
+    });
+    SoundEngine.on('chain', () => renderKnobs());
+    SoundEngine.on('pads', (pads) => renderPads(pads));
+    SoundEngine.on('progress', (value) => log('progress ' + Number(value).toFixed(2)));
+
+    document.getElementById('start').onclick = () => SoundEngine.start().then(() => log('started ' + SoundEngine.state));
+    document.getElementById('stop').onclick = () => {
+      SoundEngine.stop();
+      log('isPlaying ' + SoundEngine.isPlaying());
+    };
+    document.getElementById('play').onclick = () => {
+      SoundEngine.play();
+      log('isPlaying ' + SoundEngine.isPlaying());
+    };
+    document.getElementById('seek0').onclick = () => SoundEngine.seek(0);
+    document.getElementById('playing').onclick = () => log('isPlaying ' + SoundEngine.isPlaying() + ' ' + JSON.stringify(SoundEngine.getLoop()));
+    document.getElementById('loop').onclick = () => {
+      SoundEngine.setLoop(0, 2);
+      SoundEngine.setLoopEnabled(true);
+      log('loop ' + JSON.stringify(SoundEngine.getLoop()));
+    };
+    document.getElementById('looptoggle').onclick = () => {
+      const loop = SoundEngine.getLoop();
+      SoundEngine.setLoopEnabled(!loop.enabled);
+      log('loop ' + JSON.stringify(SoundEngine.getLoop()));
+    };
+    document.getElementById('file').onchange = () => {
+      const file = document.getElementById('file').files[0];
+      if (!file) return;
+      SoundEngine.loadFile(file).then((source) => {
+        log('loaded ' + source.name + ' ' + source.duration.toFixed(2) + 's bpm ' + source.bpm + ' ' + source.key + ' onsets ' + source.onsets.length);
+      }).catch((err) => log(String(err.message || err)));
+    };
+    document.getElementById('rec').onclick = () => {
+      SoundEngine.recordStart().then((value) => log('recordStart resolved ' + String(value)));
+    };
+    document.getElementById('recstop').onclick = () => SoundEngine.recordStop().then((source) => log('mic source ' + source.id + ' ' + source.duration.toFixed(2) + 's'));
+
+    document.querySelectorAll('[data-add]').forEach((button) => {
+      button.onclick = () => {
+        const id = SoundEngine.addPedal(button.getAttribute('data-add'));
+        selected = id;
+        log('add ' + id);
+        renderKnobs();
+      };
+    });
+    document.getElementById('bypass').onclick = () => {
+      if (!selected) return;
+      const pedal = SoundEngine.getChain().filter((item) => item.id === selected)[0];
+      if (pedal) SoundEngine.setBypass(selected, !pedal.bypass);
+    };
+    document.getElementById('remove').onclick = () => {
+      if (selected) SoundEngine.removePedal(selected);
+      selected = null;
+    };
+    document.getElementById('domove').onclick = () => {
+      if (selected) SoundEngine.movePedal(selected, Number(document.getElementById('move').value));
+    };
+    document.querySelectorAll('[data-curve]').forEach((button) => {
+      button.onclick = () => {
+        if (!selected) return;
+        const chain = SoundEngine.getChain().filter((item) => item.id === selected)[0];
+        const name = button.getAttribute('data-curve');
+        const knob = chain && chain.type === 'sweep' ? 'cutoff' : 'mix';
+        SoundEngine.setCurve(selected, {
+          knob,
+          points: SoundEngine.CURVE_PRESETS[name],
+          bars: 1,
+          amount: 1,
+        });
+        log('curve ' + name + ' on ' + knob);
+      };
+    });
+    document.getElementById('clearcurve').onclick = () => { if (selected) SoundEngine.setCurve(selected, null); };
+    document.getElementById('find').onclick = () => SoundEngine.chop('find').then((pads) => log('find ' + pads.length));
+    document.getElementById('slice').onclick = () => SoundEngine.chop('slice', { division: '1' }).then((pads) => log('slice ' + pads.length));
+    document.getElementById('random').onclick = () => SoundEngine.chop('random', { seed: 1 }).then((pads) => log('random ' + pads.length));
+    document.getElementById('fav').onclick = () => SoundEngine.setFavorite(0, true);
+    document.getElementById('bake').onclick = () => SoundEngine.bake({ what: 'region' }).then((bake) => {
+      lastBake = bake.id;
+      log('bake ' + bake.id + ' ' + bake.duration.toFixed(2) + 's');
+    });
+    document.getElementById('bakepads').onclick = () => SoundEngine.bake({ what: 'pads' }).then((bake) => {
+      lastBake = bake.id;
+      log('bake pads ' + bake.duration.toFixed(2) + 's');
+    });
+    document.getElementById('wav').onclick = () => {
+      if (!lastBake) return;
+      SoundEngine.exportWav(lastBake).then((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'soundlab.wav';
+        a.textContent = 'download';
+        a.click();
+        log('wav ' + blob.size + ' bytes');
+      });
+    };
+    document.getElementById('save').onclick = () => SoundEngine.saveProject({ name: 'Test project' }).then((id) => {
+      lastProject = id;
+      log('saved ' + id);
+    });
+    document.getElementById('load').onclick = () => {
+      if (!lastProject) return;
+      SoundEngine.loadProject(lastProject).then(() => log('loaded ' + lastProject + ' ' + JSON.stringify(SoundEngine.getLoop()) + ' playing ' + SoundEngine.isPlaying()));
+    };
+    document.getElementById('delbake').onclick = () => {
+      if (!lastBake) return;
+      SoundEngine.deleteBake(lastBake).then(() => log('deleted bake ' + lastBake));
+    };
+    document.getElementById('delproj').onclick = () => {
+      if (!lastProject) return;
+      SoundEngine.deleteProject(lastProject).then(() => log('deleted project ' + lastProject));
+    };
+    document.getElementById('proof').onclick = () => run();
+
+    function renderKnobs() {
+      const chain = SoundEngine.getChain();
+      knobEl.textContent = '';
+      chain.forEach((pedal) => {
+        const block = document.createElement('div');
+        const title = document.createElement('button');
+        title.type = 'button';
+        title.textContent = pedal.id + ' ' + pedal.type + (pedal.bypass ? ' bypassed' : '');
+        title.onclick = () => { selected = pedal.id; };
+        block.appendChild(title);
+        const def = SoundEngine.PEDAL_DEFS[pedal.type];
+        def.knobs.forEach((knob) => {
+          const row = document.createElement('label');
+          row.textContent = knob.label + ' ';
+          const slider = document.createElement('input');
+          slider.type = 'range';
+          slider.min = '0';
+          slider.max = '1';
+          slider.step = '0.001';
+          slider.value = String(pedal.knobs[knob.key]);
+          const read = document.createElement('span');
+          read.textContent = ' ' + SoundEngine.formatKnob(pedal.type, knob.key, pedal.knobs[knob.key]);
+          slider.oninput = () => {
+            const value = Number(slider.value);
+            SoundEngine.setKnob(pedal.id, knob.key, value);
+            read.textContent = ' ' + SoundEngine.formatKnob(pedal.type, knob.key, value);
+          };
+          row.appendChild(slider);
+          row.appendChild(read);
+          block.appendChild(row);
+          block.appendChild(document.createElement('br'));
+        });
+        knobEl.appendChild(block);
+      });
+    }
+
+    function renderPads(pads) {
+      const list = pads || SoundEngine.getPads();
+      padEl.textContent = '';
+      list.forEach((pad) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = pad.i + (pad.ready ? '' : '…');
+        button.onpointerdown = () => SoundEngine.trigger(pad.i);
+        button.onpointerup = () => SoundEngine.release(pad.i);
+        button.onpointerleave = () => SoundEngine.release(pad.i);
+        padEl.appendChild(button);
+      });
+    }
+
+    function tick() {
+      if (selected) document.getElementById('phase').textContent = 'phase ' + SoundEngine.curvePhase(selected).toFixed(3) + ' pos ' + SoundEngine.position().toFixed(2);
+      requestAnimationFrame(tick);
+    }
+    renderPads();
+    requestAnimationFrame(tick);
+
+    async function run() {
+      log('proof start');
+      try {
+        const result = await runProof({ log, skipStress: location.search.indexOf('skipStress=1') !== -1 });
+        window.__PROOF__ = result;
+        log('proof done');
+      } catch (err) {
+        window.__PROOF_ERROR__ = String(err && err.stack || err);
+        log('proof failed ' + window.__PROOF_ERROR__);
+      }
+      document.body.dataset.proof = 'done';
+    }
+
+    if (location.search.indexOf('proof=1') !== -1) run();
+  </script>
+</body>
+</html>

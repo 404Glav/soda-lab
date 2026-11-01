@@ -1,0 +1,2 @@
+Meyda 5.6.3 is MIT licensed (see LICENSE.md).
+The browser build meyda.min.js bundles fftjs (MIT) and dct (MIT).

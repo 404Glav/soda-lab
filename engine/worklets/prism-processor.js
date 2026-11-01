@@ -197,13 +197,13 @@ class PrismProcessor extends AudioWorkletProcessor {
       const wob = wobbleA ? wobble[i] : wobble[0];
       let sumL = 0;
       let sumR = 0;
-      let active = 0;
+      let windowSum = 0;
       for (let v = 0; v < cap; v++) {
         const voice = this.voices[v];
         if (!voice.on) continue;
-        active++;
         const phase = voice.age / voice.life;
         const win = grainWindow(phase, shape);
+        windowSum += win;
         const mod = 1 + wob * 0.05;
         sumL += readRing(this.bufL, voice.pos) * win;
         sumR += readRing(this.bufR, voice.pos) * win;
@@ -211,11 +211,12 @@ class PrismProcessor extends AudioWorkletProcessor {
         voice.age += 1;
         if (voice.age >= voice.life) voice.on = false;
       }
-      // Forward gain is about 0.85 per voice. Divide feedback by the voice
-      // count so overlapping grains cannot push the loop gain to 1 or above.
-      const wetL = Math.tanh(sumL * 0.85);
-      const wetR = Math.tanh(sumR * 0.85);
-      this.fbScale = feedback / Math.max(1, active);
+      // Average overlapping grains so density cannot multiply the loop.
+      // tanh is unity at silence and only compresses as the cloud gets loud.
+      const norm = windowSum > 1 ? windowSum : 1;
+      const wetL = Math.tanh(sumL / norm);
+      const wetR = Math.tanh(sumR / norm);
+      this.fbScale = feedback > 0.9 ? 0.9 : feedback;
       outL[i] = wetL;
       if (outR !== outL) outR[i] = wetR;
       this.prevL = wetL;

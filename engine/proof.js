@@ -380,8 +380,8 @@ async function stress(say, sr) {
   await SoundEngine.play();
   say('stress running 120s');
   await sleep(120000);
-  SoundEngine.stop();
   const glitch = await SoundEngine._glitch('read');
+  SoundEngine.stop();
   if (capacity) {
     try { capacity.rc.stop(); } catch { /* */ }
   }

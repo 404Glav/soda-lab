@@ -7,6 +7,8 @@ class GlitchProcessor extends AudioWorkletProcessor {
     this.jumps = 0;
     this.dropouts = 0;
     this.zeroRun = 0;
+    this.heard = false;
+    this.firstDropoutSample = -1;
     this.samples = 0;
     this.sum = 0;
     this.peak = 0;
@@ -18,6 +20,7 @@ class GlitchProcessor extends AudioWorkletProcessor {
           nonfinite: this.nonfinite,
           jumps: this.jumps,
           dropouts: this.dropouts,
+          firstDropoutSample: this.firstDropoutSample,
           samples: this.samples,
           rms: this.samples ? Math.sqrt(this.sum / this.samples) : 0,
           peak: this.peak,
@@ -27,6 +30,8 @@ class GlitchProcessor extends AudioWorkletProcessor {
         this.jumps = 0;
         this.dropouts = 0;
         this.zeroRun = 0;
+        this.heard = false;
+        this.firstDropoutSample = -1;
         this.samples = 0;
         this.sum = 0;
         this.peak = 0;
@@ -59,9 +64,15 @@ class GlitchProcessor extends AudioWorkletProcessor {
       if (a > this.peak) this.peak = a;
       this.sum += l * l + r * r;
       if (a < 1e-5) {
-        this.zeroRun++;
-        if (this.zeroRun === zeroLimit) this.dropouts++;
+        if (this.heard) {
+          this.zeroRun++;
+          if (this.zeroRun === zeroLimit) {
+            this.dropouts++;
+            if (this.firstDropoutSample < 0) this.firstDropoutSample = this.samples + i;
+          }
+        }
       } else {
+        this.heard = true;
         this.zeroRun = 0;
       }
       this.prevL = l;

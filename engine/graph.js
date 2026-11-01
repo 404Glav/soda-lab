@@ -30,9 +30,16 @@ export async function ensureWorklets(ctx) {
   loaded.add(ctx);
 }
 
-/* Peak loop gain. A true 0.95 would stay above -60 dB longer than the 10 s
-   tail cap at the longest delay. 0.25 is about 12 dB down per repeat. */
-const REEL_FB_MAX = 0.25;
+/* Small-signal loop gain. Full knob is about -1 dB per repeat. The power
+   curve puts the halfway mark near 5 repeats (-12 dB) so the top of the
+   knob is where the long trails are. */
+const FEEDBACK_MAX = 0.9;
+const FEEDBACK_SHAPE = 1.85;
+
+function feedbackGain(v) {
+  const x = clamp01(v);
+  return FEEDBACK_MAX * Math.pow(x, FEEDBACK_SHAPE);
+}
 const DRIVE = makeCurve(2048, (x) => Math.tanh(x * 2.2));
 const FUZZ = makeCurve(2048, (x) => {
   const y = x * 2.4;
@@ -287,7 +294,7 @@ export function createGraph(ctx, toneCtx, options) {
         const sec = timeSeconds(pedal.knobs.time, pedal.knobs.free, bpm, 20, 400);
         writeAt(p.grainSec, Math.min(0.75, Math.max(0.012, sec)), time, smooth, schedule);
       } else if (key === 'repeats') {
-        writeAt(p.feedback, Math.min(0.95, v * 0.95), time, smooth, schedule);
+        writeAt(p.feedback, feedbackGain(v), time, smooth, schedule);
       } else if (key === 'shape') {
         writeAt(p.shape, v, time, smooth, schedule);
       } else if (key === 'pitch') {
@@ -327,9 +334,8 @@ export function createGraph(ctx, toneCtx, options) {
           n.clipWet.curve = curves.wet;
           n.clipFb.curve = curves.fb;
         }
-        const fb = Math.min(REEL_FB_MAX, (pedal.knobs.feedback || 0) * REEL_FB_MAX);
         const headroom = reelHeadroom(pedal.knobs);
-        writeAt(p.feedback, fb / headroom, time, smooth, schedule);
+        writeAt(p.feedback, feedbackGain(pedal.knobs.feedback || 0) / headroom, time, smooth, schedule);
       } else if (key === 'mix') {
         blend(pedal, v, pedal.bypass, time, smooth, schedule);
       }

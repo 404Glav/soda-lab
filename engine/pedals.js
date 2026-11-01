@@ -234,6 +234,27 @@ export function timeSeconds(timeV, freeV, bpm, freeMin, freeMax) {
   return TIME_BEATS[i] * (60 / tempo);
 }
 
+/** Silence hold for bake tails: longest delay or grain spacing, plus 50 ms, at least 100 ms. */
+export function tailHoldSeconds(chain, bpm) {
+  let hold = 0.1;
+  const list = chain || [];
+  for (let i = 0; i < list.length; i++) {
+    const pedal = list[i];
+    if (!pedal || pedal.bypass) continue;
+    const k = pedal.knobs || {};
+    if (pedal.type === 'reel') {
+      const sec = Math.min(1.6, Math.max(0.02, timeSeconds(k.time, k.free, bpm, 40, 800)));
+      hold = Math.max(hold, sec + 0.05);
+    } else if (pedal.type === 'prism') {
+      const sec = Math.min(0.75, Math.max(0.012, timeSeconds(k.time, k.free, bpm, 20, 400)));
+      hold = Math.max(hold, sec + 0.05);
+    } else if (pedal.type === 'cathedral') {
+      hold = Math.max(hold, linMap(k.predelay, 0, 0.2) + 0.05);
+    }
+  }
+  return Math.min(Math.max(0.1, hold), 9.5);
+}
+
 export function eqPower(mix) {
   const m = clamp01(mix);
   return [Math.cos(m * Math.PI * 0.5), Math.sin(m * Math.PI * 0.5)];

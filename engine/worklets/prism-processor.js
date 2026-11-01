@@ -61,6 +61,7 @@ class PrismProcessor extends AudioWorkletProcessor {
     this.write = 0;
     this.prevL = 0;
     this.prevR = 0;
+    this.fbScale = 0;
     this.voices = [];
     for (let i = 0; i < 16; i++) {
       this.voices.push({ on: false, pos: 0, step: 1, age: 0, life: 1 });
@@ -94,6 +95,7 @@ class PrismProcessor extends AudioWorkletProcessor {
     this.prevR = 0;
     this.wait = 1;
     this.spawns = 0;
+    this.fbScale = 0;
     this.bag.length = 0;
     this.rand = mulberry32(this.seed >>> 0);
     for (let i = 0; i < this.voices.length; i++) this.voices[i].on = false;
@@ -174,11 +176,16 @@ class PrismProcessor extends AudioWorkletProcessor {
     const cap = Math.max(1, Math.min(16, voiceCap));
 
     for (let i = 0; i < n; i++) {
-      if (!freeze) {
-        const fbL = Math.tanh(this.prevL) * feedback;
-        const fbR = Math.tanh(this.prevR) * feedback;
-        this.bufL[this.write] = (inL[i] || 0) + fbL;
-        this.bufR[this.write] = (inR[i] || 0) + fbR;
+      const inSampleL = inL[i] || 0;
+      const inSampleR = inR[i] || 0;
+      const incoming = Math.abs(inSampleL) + Math.abs(inSampleR) > 1e-5;
+      let advance = true;
+      if (!freeze || incoming) {
+        const scale = freeze ? 0 : (this.fbScale || 0);
+        this.bufL[this.write] = inSampleL + this.prevL * scale;
+        this.bufR[this.write] = inSampleR + this.prevR * scale;
+      } else {
+        advance = false;
       }
       this.wait -= 1;
       if (this.wait <= 0) {
@@ -190,9 +197,11 @@ class PrismProcessor extends AudioWorkletProcessor {
       const wob = wobbleA ? wobble[i] : wobble[0];
       let sumL = 0;
       let sumR = 0;
+      let active = 0;
       for (let v = 0; v < cap; v++) {
         const voice = this.voices[v];
         if (!voice.on) continue;
+        active++;
         const phase = voice.age / voice.life;
         const win = grainWindow(phase, shape);
         const mod = 1 + wob * 0.05;
@@ -202,14 +211,19 @@ class PrismProcessor extends AudioWorkletProcessor {
         voice.age += 1;
         if (voice.age >= voice.life) voice.on = false;
       }
+      // Forward gain is about 0.85 per voice. Divide feedback by the voice
+      // count so overlapping grains cannot push the loop gain to 1 or above.
       const wetL = Math.tanh(sumL * 0.85);
       const wetR = Math.tanh(sumR * 0.85);
+      this.fbScale = feedback / Math.max(1, active);
       outL[i] = wetL;
       if (outR !== outL) outR[i] = wetR;
       this.prevL = wetL;
       this.prevR = wetR;
-      this.write++;
-      if (this.write >= this.length) this.write = 0;
+      if (advance) {
+        this.write++;
+        if (this.write >= this.length) this.write = 0;
+      }
     }
     this.sampleCount += n;
     if (this.sampleCount - this.lastReport > sampleRate) {

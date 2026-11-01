@@ -44,9 +44,11 @@ function quant(x, steps) {
   let y = x;
   if (y > 1) y = 1;
   else if (y < -1) y = -1;
-  const s = Math.max(2, steps);
-  const q = Math.round((y + 1) * 0.5 * (s - 1));
-  return (q / (s - 1)) * 2 - 1;
+  const maxQ = Math.max(1, steps / 2);
+  const q = Math.round(y * maxQ) / maxQ;
+  if (q > 1) return 1;
+  if (q < -1) return -1;
+  return q;
 }
 
 registerProcessor('crusher-bit', CrusherProcessor);

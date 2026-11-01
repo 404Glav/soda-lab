@@ -30,7 +30,9 @@ export async function ensureWorklets(ctx) {
   loaded.add(ctx);
 }
 
-const TANH = makeCurve(2048, (x) => Math.tanh(x * 1.6));
+/* Peak loop gain. A true 0.95 would stay above -60 dB longer than the 10 s
+   tail cap at the longest delay. 0.25 is about 12 dB down per repeat. */
+const REEL_FB_MAX = 0.25;
 const DRIVE = makeCurve(2048, (x) => Math.tanh(x * 2.2));
 const FUZZ = makeCurve(2048, (x) => {
   const y = x * 2.4;
@@ -90,6 +92,29 @@ function makeModulator(toneCtx, nativeCtx, frequency) {
       tone: false,
     };
   }
+}
+
+function ageCurves(drive) {
+  const g = Math.max(1, drive);
+  const n = 2048;
+  const wet = new Float32Array(n);
+  const fb = new Float32Array(n);
+  const wetNorm = Math.tanh(g) || 1;
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    const y = Math.tanh(x * g);
+    wet[i] = y / wetNorm;
+    fb[i] = y / g;
+  }
+  return { wet, fb };
+}
+
+function reelHeadroom(knobs) {
+  const wow = knobs.wow || 0;
+  const flutter = knobs.flutter || 0;
+  const wowSlew = wow * 0.007 * 2 * Math.PI * (0.25 + wow * 1.1);
+  const flutterSlew = flutter * 0.0028 * 2 * Math.PI * (6 + flutter * 7);
+  return 1 + wowSlew + flutterSlew;
 }
 
 function shaper(ctx, curve, oversample) {
@@ -289,17 +314,22 @@ export function createGraph(ctx, toneCtx, options) {
       if (key === 'time' || key === 'free') {
         const sec = timeSeconds(pedal.knobs.time, pedal.knobs.free, bpm, 40, 800);
         writeAt(p.delay, Math.min(1.6, Math.max(0.02, sec)), time, smooth, schedule);
-      } else if (key === 'feedback') {
-        writeAt(p.feedback, Math.min(0.95, v * 0.95), time, smooth, schedule);
-      } else if (key === 'wow') {
-        writeAt(p.wow, v * 0.007, time, smooth, schedule);
-        writeAt(n.wow.lfo.frequency, 0.25 + v * 1.1, time, smooth, schedule);
-      } else if (key === 'flutter') {
-        writeAt(p.flutter, v * 0.0028, time, smooth, schedule);
-        writeAt(n.flutter.lfo.frequency, 6 + v * 7, time, smooth, schedule);
-      } else if (key === 'age') {
-        writeAt(p.ageFreq, logMap(1 - v, 700, 12000), time, smooth, schedule);
-        writeAt(p.ageDrive, 1 + v * 7, time, smooth, schedule);
+      } else if (key === 'feedback' || key === 'wow' || key === 'flutter' || key === 'age') {
+        if (key === 'wow') {
+          writeAt(p.wow, v * 0.007, time, smooth, schedule);
+          writeAt(n.wow.lfo.frequency, 0.25 + v * 1.1, time, smooth, schedule);
+        } else if (key === 'flutter') {
+          writeAt(p.flutter, v * 0.0028, time, smooth, schedule);
+          writeAt(n.flutter.lfo.frequency, 6 + v * 7, time, smooth, schedule);
+        } else if (key === 'age') {
+          writeAt(p.ageFreq, logMap(1 - v, 700, 12000), time, smooth, schedule);
+          const curves = ageCurves(1 + v * 7);
+          n.clipWet.curve = curves.wet;
+          n.clipFb.curve = curves.fb;
+        }
+        const fb = Math.min(REEL_FB_MAX, (pedal.knobs.feedback || 0) * REEL_FB_MAX);
+        const headroom = reelHeadroom(pedal.knobs);
+        writeAt(p.feedback, fb / headroom, time, smooth, schedule);
       } else if (key === 'mix') {
         blend(pedal, v, pedal.bypass, time, smooth, schedule);
       }
@@ -484,8 +514,9 @@ export function createGraph(ctx, toneCtx, options) {
     const delay = ctx.createDelay(3);
     delay.delayTime.value = 0.25;
     const lowpass = biquad(ctx, 'lowpass', 6000);
-    const drive = ctx.createGain();
-    const clip = shaper(ctx, TANH, '2x');
+    const curves = ageCurves(1 + (pedal.knobs.age || 0) * 7);
+    const clipWet = shaper(ctx, curves.wet, '2x');
+    const clipFb = shaper(ctx, curves.fb, '2x');
     const feedback = ctx.createGain();
     feedback.gain.value = 0.3;
     const wow = makeModulator(toneCtx, ctx, 0.4);
@@ -493,21 +524,20 @@ export function createGraph(ctx, toneCtx, options) {
     pedal.input.connect(sum);
     sum.connect(delay);
     delay.connect(lowpass);
-    lowpass.connect(drive);
-    drive.connect(clip);
-    clip.connect(feedback);
+    lowpass.connect(clipWet);
+    lowpass.connect(clipFb);
+    clipFb.connect(feedback);
     feedback.connect(sum);
-    clip.connect(pedal.wet.input);
+    clipWet.connect(pedal.wet.input);
     wow.node.connect(delay.delayTime);
     flutter.node.connect(delay.delayTime);
-    pedal.nodes = { delay, lowpass, drive, clip, feedback, wow, flutter, lfos: [wow.lfo, flutter.lfo] };
+    pedal.nodes = { delay, lowpass, clipWet, clipFb, feedback, wow, flutter, lfos: [wow.lfo, flutter.lfo] };
     pedal.params = {
       delay: delay.delayTime,
       feedback: feedback.gain,
       wow: wow.depth,
       flutter: flutter.depth,
       ageFreq: lowpass.frequency,
-      ageDrive: drive.gain,
     };
     pedals.push(pedal);
     return pedal;

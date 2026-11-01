@@ -1,7 +1,7 @@
 import { Context, getTransport, setContext } from './vendor/tone/index.js';
 import {
   PEDAL_DEFS, CURVE_PRESETS, formatKnob, clamp01, defaultKnobs, snapBars,
-  cycleSeconds,
+  cycleSeconds, tailHoldSeconds,
 } from './pedals.js';
 import { mulberry32 } from './rng.js';
 import { settings as storedSettings } from './storage.js';
@@ -266,8 +266,8 @@ const TAIL_THRESHOLD = Math.pow(10, -60 / 20);
 const TAIL_HOLD_SEC = 0.1;
 const TAIL_MAX_SEC = 10;
 
-function trimTail(left, right, regionFrames, sampleRate) {
-  const hold = Math.max(1, Math.round(TAIL_HOLD_SEC * sampleRate));
+function trimTail(left, right, regionFrames, sampleRate, holdSec) {
+  const hold = Math.max(1, Math.round(Math.max(TAIL_HOLD_SEC, holdSec || TAIL_HOLD_SEC) * sampleRate));
   const limit = Math.min(left.length, regionFrames + Math.round(TAIL_MAX_SEC * sampleRate));
   let quiet = 0;
   let cut = limit;
@@ -1019,7 +1019,8 @@ const api = {
     let outL = rendered.buffer.getChannelData(0);
     let outR = rendered.buffer.numberOfChannels > 1 ? rendered.buffer.getChannelData(1) : outL;
     if (withTail) {
-      const trimmed = trimTail(outL, outR, regionFrames, rendered.buffer.sampleRate);
+      const hold = tailHoldSeconds(api.getChain(), tempo());
+      const trimmed = trimTail(outL, outR, regionFrames, rendered.buffer.sampleRate, hold);
       outL = trimmed.left;
       outR = trimmed.right;
     } else {

@@ -1916,9 +1916,11 @@ async function saveBakeFlow() {
   const bake = S.bake;
   if (!bake) return;
   const name = (bake.name || '').trim() || 'Untitled';
+  if (bake.result) bakeNames.set(bake.result.id, name);
+  const project = S.projectName || name;
   try {
-    await E.saveProject({ name });
-    S.projectName = name;
+    await E.saveProject({ name: project });
+    S.projectName = project;
     await loadShelf();
     closeSheet(true);
     go('shelf');

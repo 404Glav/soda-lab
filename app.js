@@ -59,6 +59,7 @@ const S = {
 };
 const bakeNames = new Map();
 const bakePeaks = new Map();
+const BAKE_META = 'soundlab-bakes';
 const fakeCache = new Map();
 const WAVES = [];
 
@@ -133,6 +134,50 @@ function pedalSummary(pedal) {
     parts.push(knob.label + ' ' + E.formatKnob(pedal.type, knob.key, pedal.knobs[knob.key]));
   }
   return parts.join(' · ');
+}
+
+/* ─────────── bake names + card peaks (localStorage) ─────────── */
+
+/* 256 min/max pairs is plenty for a shelf card and keeps each bake ~3 KB. */
+function shrinkPeaks(peaks) {
+  const src = peaks.length / 2;
+  const n = Math.min(256, src);
+  const out = new Float32Array(n * 2);
+  for (let b = 0; b < n; b++) {
+    let lo = 0;
+    let hi = 0;
+    for (let i = Math.floor(b * src / n); i < Math.floor((b + 1) * src / n); i++) {
+      lo = Math.min(lo, peaks[i * 2]);
+      hi = Math.max(hi, peaks[i * 2 + 1]);
+    }
+    out[b * 2] = lo;
+    out[b * 2 + 1] = hi;
+  }
+  return out;
+}
+
+function storeBakeMeta() {
+  const out = {};
+  bakeNames.forEach((name, id) => { out[id] = { name }; });
+  bakePeaks.forEach((peaks, id) => {
+    (out[id] = out[id] || {}).peaks = Array.from(peaks, (v) => Math.round(v * 1000) / 1000);
+  });
+  try { localStorage.setItem(BAKE_META, JSON.stringify(out)); } catch (err) { /* names fall back to durations */ }
+}
+
+function restoreBakeMeta() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(BAKE_META) || '{}');
+    Object.keys(saved).forEach((id) => {
+      if (saved[id].name) bakeNames.set(id, saved[id].name);
+      if (saved[id].peaks) bakePeaks.set(id, Float32Array.from(saved[id].peaks));
+    });
+  } catch (err) { /* ignore a bad entry */ }
+}
+
+function nameBake(id, name) {
+  bakeNames.set(id, (name || '').trim() || 'Bake');
+  storeBakeMeta();
 }
 
 /* ─────────── pedal artwork ─────────── */
@@ -528,6 +573,12 @@ async function loadShelf() {
       E.listBakes(), E.listSources(), E.listProjects(),
     ]);
     if (token !== S.shelfToken) return;
+    const live = new Set(bakes.map((bake) => bake.id));
+    let stale = false;
+    [bakeNames, bakePeaks].forEach((map) => map.forEach((value, id) => {
+      if (!live.has(id)) { map.delete(id); stale = true; }
+    }));
+    if (stale) storeBakeMeta();
     const items = [];
     for (let i = 0; i < bakes.length; i++) {
       const bake = bakes[i];
@@ -1845,7 +1896,10 @@ function renderBakeSheet() {
   });
 
   const name = $('#bakeName');
-  name.addEventListener('input', () => { bake.name = name.value; });
+  name.addEventListener('input', () => {
+    bake.name = name.value;
+    if (bake.result) nameBake(bake.result.id, bake.name);
+  });
 
   const tail = $('#bakeTail');
   tail.addEventListener('click', () => {
@@ -1890,8 +1944,8 @@ async function runBake() {
     S.baking = false;
     bake.result = result;
     bake.elapsed = (performance.now() - started) / 1000;
-    bakePeaks.set(result.id, result.peaks);
-    bakeNames.set(result.id, bake.name || 'Bake');
+    bakePeaks.set(result.id, shrinkPeaks(result.peaks));
+    nameBake(result.id, bake.name);
     await loadShelf();
     if (S.sheet.kind === 'bake') renderBakeSheet();
     toast('Baked ' + fmtTime(result.duration));
@@ -1916,7 +1970,7 @@ async function saveBakeFlow() {
   const bake = S.bake;
   if (!bake) return;
   const name = (bake.name || '').trim() || 'Untitled';
-  if (bake.result) bakeNames.set(bake.result.id, name);
+  if (bake.result) nameBake(bake.result.id, name);
   const project = S.projectName || name;
   try {
     await E.saveProject({ name: project });
@@ -2347,6 +2401,7 @@ function init() {
 
   S.chain = E.getChain();
   S.pads = E.getPads();
+  restoreBakeMeta();
 
   wireStatic();
   wirePadInput();

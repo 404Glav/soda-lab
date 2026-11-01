@@ -1416,3 +1416,26 @@ body.has-sheet .toast.is-show { transform: translate(-50%, 0); }
 
 /* keep the transport above the tab bar */
 .transport { bottom: calc(var(--tabbar-h) + 6px); z-index: 3; }
+
+/* resume pill: audio was suspended or interrupted */
+.resume-pill {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 56px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 99px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 620;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+  box-shadow: 0 10px 30px -8px rgba(0,0,0,.45);
+}
+.resume-pill[hidden] { display: none; }

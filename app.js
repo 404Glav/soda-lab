@@ -2016,9 +2016,16 @@ function openBakeDetailSheet(id) {
 
 /* ─────────── transport + pads input ─────────── */
 
+/* Audio can be suspended or interrupted (calls, other apps, a locked phone). */
+function wake() {
+  if (!S.started || E.state === 'running') return Promise.resolve();
+  return E.resume().catch(() => { /* the resume pill stays up */ });
+}
+
 async function togglePlay() {
   if (!S.source) { openLoadSheet(); return; }
   try {
+    await wake();
     if (E.isPlaying()) E.stop();
     else await E.play();
     syncPlayButton();
@@ -2040,6 +2047,7 @@ function wirePadInput() {
     if (Number.isNaN(index)) return;
     padPress = { el, index, x: event.clientX, y: event.clientY };
     el.classList.add('is-on');
+    wake();
     E.trigger(index);
     clearTimeout(padTimer);
     padTimer = setTimeout(() => {
@@ -2089,6 +2097,9 @@ function wireStatic() {
   on('#chainAdd', 'click', openPedalPicker);
   on('#chainEmptyAdd', 'click', openPedalPicker);
   on('#padsChop', 'click', () => doChop('find'));
+  on('#resumeBtn', 'click', () => {
+    wake().then(() => { if (E.state === 'running') toast('Sound is back', 1200); });
+  });
 
   on('#shelfFilters', 'click', (event) => {
     const chip = event.target.closest('.fchip');
@@ -2153,6 +2164,7 @@ function wireStatic() {
     event.preventDefault();
     const index = Number(target.dataset.pad);
     if (Number.isNaN(index)) return;
+    wake();
     E.trigger(index);
     target.classList.add('is-on');
     setTimeout(() => {
@@ -2193,6 +2205,11 @@ function wireEngine() {
       renderPadGrid();
       renderPadsWaveChops();
     });
+  });
+
+  E.on('state', (state) => {
+    const btn = $('#resumeBtn');
+    if (btn) btn.hidden = !S.started || state === 'running' || state === 'idle';
   });
 
   E.on('error', (err) => {

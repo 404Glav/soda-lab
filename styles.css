@@ -1278,7 +1278,7 @@ svg { display: block; }
    ----------------------------------------------------------- */
 
 /* status bar sits above the boot screen */
-.statusbar { z-index: 46; }
+.statusbar { z-index: 65; } /* above the sheet scrim, below toasts */
 body.is-booting .statusbar { color: #fff; }
 
 /* waveform layers */
@@ -1411,13 +1411,12 @@ body.is-booting .statusbar { color: #fff; }
 /* recording timer */
 .rec-time { font-size: 10px; font-weight: 650; color: #E7555F; font-variant-numeric: tabular-nums; }
 
-/* keep toasts clear of sheet actions */
-body.has-sheet .toast {
-  top: 62px;
+/* one toast spot for every screen: just under the status bar, clear of sheet actions */
+.toast {
+  top: 64px;
   bottom: auto;
-  transform: translate(-50%, -12px);
+  transform: translate(-50%, -8px);
 }
-body.has-sheet .toast.is-show { transform: translate(-50%, 0); }
 
 /* keep the transport above the tab bar. Sticky offsets count from inside the
    view's bottom padding (tab bar + 30px), so -24px lands it 6px above the bar. */

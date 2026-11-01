@@ -1327,6 +1327,8 @@ function openPedalSheet(id) {
         bars: 1,
         amount: 0,
       };
+  const curveKnob = def.knobs.find((knob) => knob.key === curve.knob);
+  const curveLabel = curveKnob ? curveKnob.label : def.name;
   const body = $('#sheetBody');
   body.innerHTML = `
     <div class="pedal-hero">
@@ -1353,7 +1355,7 @@ function openPedalSheet(id) {
     })).join('')}</div>
     <div class="curve-card">
       <div class="curve-head">
-        <span class="curve-title">Movement · ${esc(def.name)}</span>
+        <span class="curve-title">Movement · ${esc(curveLabel)}</span>
         <span class="curve-sub" id="curveState">${curve.amount > 0 ? 'On' : 'Off'}</span>
       </div>
       <div class="curve-targets" id="curveTargets">

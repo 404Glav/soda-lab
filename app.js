@@ -1377,7 +1377,7 @@ function openPedalSheet(id) {
         <input id="curveRange" type="range" min="0" max="100" value="${Math.round(curve.amount * 100)}" aria-label="Range" />
         <span id="curveAmount">Range ${Math.round(curve.amount * 100)}%</span>
       </div>
-      <div class="pair" style="margin-top:10px">
+      <div class="pair" style="margin-top:22px">
         <button class="mini-btn" id="curveClear">Clear</button>
         <button class="mini-btn is-on" id="curveDone">Done</button>
       </div>

@@ -12,6 +12,7 @@ const WORKLETS = [
   'pad-processor.js',
   'capture-processor.js',
   'glitch-processor.js',
+  'limiter-processor.js',
 ];
 
 const loaded = new WeakSet();
@@ -163,8 +164,25 @@ export function createGraph(ctx, toneCtx, options) {
   compressor.attack.value = 0.003;
   compressor.release.value = 0.08;
 
+  const lookaheadSec = 0.003;
+  const limiterLatency = Math.max(1, Math.round(ctx.sampleRate * lookaheadSec)) / ctx.sampleRate;
+  const limiterState = { reduction: 0 };
+  const limiter = new AudioWorkletNode(ctx, 'master-limiter', {
+    numberOfInputs: 1,
+    numberOfOutputs: 1,
+    outputChannelCount: [2],
+    channelCount: 2,
+    channelCountMode: 'explicit',
+    processorOptions: { lookaheadSec, ceilingDb: -1, releaseSec: 0.08 },
+  });
+  limiter.port.onmessage = (event) => {
+    const data = event.data || {};
+    if (data.type === 'gr' && Number.isFinite(data.gr)) limiterState.reduction = data.gr;
+  };
+
   duck.connect(compressor);
-  compressor.connect(ctx.destination);
+  compressor.connect(limiter);
+  limiter.connect(ctx.destination);
 
   const live = typeof ctx.createMediaStreamDestination === 'function';
   let analyserL = null;
@@ -179,7 +197,7 @@ export function createGraph(ctx, toneCtx, options) {
 
   if (live) {
     const split = ctx.createChannelSplitter(2);
-    compressor.connect(split);
+    limiter.connect(split);
     analyserL = ctx.createAnalyser();
     analyserR = ctx.createAnalyser();
     analyserL.fftSize = 256;
@@ -200,7 +218,7 @@ export function createGraph(ctx, toneCtx, options) {
       numberOfOutputs: 1,
       outputChannelCount: [2],
     });
-    compressor.connect(glitch);
+    limiter.connect(glitch);
     glitch.connect(sink);
 
     directCapture = new AudioWorkletNode(ctx, 'capture-tap', {
@@ -208,12 +226,12 @@ export function createGraph(ctx, toneCtx, options) {
       numberOfOutputs: 1,
       outputChannelCount: [2],
     });
-    compressor.connect(directCapture);
+    limiter.connect(directCapture);
     directCapture.connect(sink);
 
     const mediaDest = ctx.createMediaStreamDestination();
     mediaDest.channelCount = 2;
-    compressor.connect(mediaDest);
+    limiter.connect(mediaDest);
     const mediaSrc = ctx.createMediaStreamSource(mediaDest.stream);
     streamCapture = new AudioWorkletNode(ctx, 'capture-tap', {
       numberOfInputs: 1,
@@ -708,6 +726,9 @@ export function createGraph(ctx, toneCtx, options) {
     input,
     duck,
     compressor,
+    limiter,
+    limiterState,
+    limiterLatency,
     analyserL,
     analyserR,
     glitch,

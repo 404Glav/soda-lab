@@ -428,6 +428,7 @@ svg { display: block; }
 .card-art canvas { width: 100%; height: 100%; display: block; }
 .card-badge {
   position: absolute;
+  z-index: 1;
   top: 7px; left: 7px;
   padding: 3px 7px;
   border-radius: 6px;

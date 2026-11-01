@@ -1439,3 +1439,25 @@ body.has-sheet .toast.is-show { transform: translate(-50%, 0); }
   box-shadow: 0 10px 30px -8px rgba(0,0,0,.45);
 }
 .resume-pill[hidden] { display: none; }
+
+/* drag reorder */
+.chain-grip {
+  flex: 0 0 44px;
+  align-self: stretch;
+  margin: -10px -12px -10px -4px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+  touch-action: none;
+  cursor: grab;
+}
+.is-sorting { user-select: none; -webkit-user-select: none; }
+.is-sorting > .chain-row, .is-sorting .pedal { transition: transform .18s var(--ease), opacity .24s; }
+.chain-row.is-lifted, .pedal.is-lifted {
+  position: relative;
+  z-index: 5;
+  transition: none;
+  cursor: grabbing;
+}
+.chain-row.is-lifted { box-shadow: 0 14px 30px -10px rgba(20,18,14,.35); }
+.pedal.is-lifted .pedal-art { filter: drop-shadow(0 12px 16px rgba(20,18,14,.3)); }

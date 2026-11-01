@@ -647,9 +647,14 @@ function renderBoard() {
   updateTransportTime(E.position());
 }
 
+function chainShape(chain) {
+  return chain.map((pedal) => pedal.id + (pedal.bypass ? '-' : '+')).join();
+}
+
 function renderChainRail() {
   const host = $('#boardChain');
   if (!host) return;
+  S.railShape = chainShape(S.chain);
   const rail = $('.chain-rail', host);
   const scroll = rail ? rail.scrollLeft : 0;
   const pedals = S.chain.map((pedal) => `
@@ -765,6 +770,9 @@ function renderChainList() {
         <div class="chain-sub">${esc(pedalSummary(pedal))}</div>
       </div>
       <span class="chain-state${pedal.bypass ? ' is-off' : ''}">${pedal.bypass ? 'Off' : 'On'}</span>
+      <span class="chain-grip" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M6 9h12M6 15h12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </span>
     </button>`).join('');
   const empty = $('#chainEmpty');
   if (empty) empty.hidden = S.chain.length > 0;
@@ -1004,6 +1012,83 @@ async function loadFileFlow(file) {
   } catch (err) {
     toast(err && err.message ? err.message : 'Could not load that file.', 4000);
   }
+}
+
+/* ─────────── drag reorder ─────────── */
+
+/* Drag a pedal along its list. Neighbours slide with transforms and the
+   engine order follows live; the DOM is rebuilt once on drop. Rows drag by
+   their grip (touch too); rail pedals drag with a mouse or pen, since a
+   finger on the rail scrolls it. */
+function wireReorder(host, opts) {
+  let drag = null;
+  const vertical = opts.axis === 'y';
+  const coord = (event) => (vertical ? event.clientY : event.clientX);
+  const paint = (st) => {
+    st.frame = 0;
+    const to = clamp(st.from + Math.round(st.d / st.step), 0, st.items.length - 1);
+    const move = vertical ? 'translateY(' : 'translateX(';
+    st.items.forEach((el, i) => {
+      let shift = 0;
+      if (el === st.item) shift = st.d;
+      else if (st.from < to && i > st.from && i <= to) shift = -st.step;
+      else if (to < st.from && i >= to && i < st.from) shift = st.step;
+      el.style.transform = shift ? move + shift + 'px)' : '';
+    });
+    if (to !== st.to) {
+      st.to = to;
+      E.movePedal(st.id, to);
+    }
+  };
+  host.addEventListener('pointerdown', (event) => {
+    if (event.button || drag) return;
+    const item = event.target.closest(opts.item);
+    if (!item || !host.contains(item)) return;
+    if (opts.handle ? !event.target.closest(opts.handle) : event.pointerType === 'touch') return;
+    const items = $$(opts.item, host);
+    const index = items.indexOf(item);
+    const a = items[0];
+    const b = items[1];
+    drag = {
+      item, items, id: item.dataset.pedal, pointerId: event.pointerId,
+      from: index, to: index, start: coord(event), d: 0, on: false, frame: 0,
+      step: b ? (vertical ? b.offsetTop - a.offsetTop : b.offsetLeft - a.offsetLeft) : 1,
+    };
+  });
+  host.addEventListener('pointermove', (event) => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const d = coord(event) - drag.start;
+    if (!drag.on) {
+      if (Math.abs(d) < 6) return;
+      drag.on = true;
+      S.dragging = true;
+      drag.item.setPointerCapture(event.pointerId);
+      drag.item.classList.add('is-lifted');
+      host.classList.add('is-sorting');
+    }
+    event.preventDefault();
+    drag.d = d;
+    if (!drag.frame) {
+      const st = drag;
+      st.frame = requestAnimationFrame(() => paint(st));
+    }
+  });
+  const end = (event) => {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const st = drag;
+    drag = null;
+    if (!st.on) return;
+    if (st.frame) { cancelAnimationFrame(st.frame); paint(st); }
+    S.dragging = false;
+    S.dragEndAt = performance.now();
+    host.classList.remove('is-sorting');
+    st.items.forEach((el) => { el.style.transform = ''; el.classList.remove('is-lifted'); });
+    S.chain = E.getChain();
+    renderChainRail();
+    renderChainList();
+  };
+  host.addEventListener('pointerup', end);
+  host.addEventListener('pointercancel', end);
 }
 
 /* ─────────── pedal picker ─────────── */
@@ -2146,6 +2231,7 @@ function wireStatic() {
   document.addEventListener('click', (event) => {
     if (event.target.closest('[data-close-sheet]')) { closeSheet(); return; }
     const pedal = event.target.closest('[data-pedal]');
+    if (pedal && performance.now() - (S.dragEndAt || 0) < 400) return;
     if (pedal) { openPedalSheet(pedal.dataset.pedal); return; }
     if (event.target.closest('[data-add-pedal]')) { openPedalPicker(); return; }
     const source = event.target.closest('[data-source]');
@@ -2184,7 +2270,9 @@ function wireEngine() {
   let chainDirty = false;
   E.on('chain', (chain) => {
     S.chain = chain;
-    if (S.sheet.kind === 'pedal') return;
+    if (S.dragging) return;
+    /* under the pedal sheet, only order and bypass changes repaint (not every knob move) */
+    if (S.sheet.kind === 'pedal' && chainShape(chain) === S.railShape) return;
     if (chainDirty) return;
     chainDirty = true;
     requestAnimationFrame(() => {
@@ -2260,6 +2348,8 @@ function init() {
 
   wireStatic();
   wirePadInput();
+  wireReorder($('#chainList'), { item: '.chain-row', handle: '.chain-grip', axis: 'y' });
+  wireReorder($('#boardChain'), { item: '.pedal', axis: 'x' });
   wireEngine();
 
   renderShelf();

@@ -359,18 +359,30 @@ export function createGraph(ctx, toneCtx, options) {
     }
   }
 
-  function scheduleCurve(pedal, curve, bpm, duration, isLite) {
+  function playheadAt(origin, t, loop) {
+    let p = origin + t;
+    if (loop && loop.enabled && loop.end > loop.start && origin < loop.end && p >= loop.end) {
+      const span = loop.end - loop.start;
+      const first = loop.end - origin;
+      if (span > 0 && t >= first) p = loop.start + ((t - first) % span);
+    }
+    return p;
+  }
+
+  function scheduleCurve(pedal, curve, bpm, duration, isLite, originSec, audioTime0, loop) {
     if (!curve) return;
     const cycle = cycleSeconds(curve.bars, bpm);
-    const step = Math.min(0.025, Math.max(0.01, cycle / 48));
-    const scale = pedal.type === 'sweep' && curve.knob !== 'curve' ? pedal.knobs.curve : 1;
+    const step = Math.min(0.02, Math.max(0.01, cycle / 64));
     const base = pedal.knobs[curve.knob];
+    const origin = originSec || 0;
+    const t0 = audioTime0 || 0;
     for (let t = 0; t <= duration + 1e-4; t += step) {
-      const phase = cycle > 0 ? (t % cycle) / cycle : 0;
-      const value = modulate(base, curve, phase, scale);
+      const playhead = playheadAt(origin, t, loop);
+      const phase = cycle > 0 ? ((playhead % cycle) + cycle) % cycle / cycle : 0;
+      const value = modulate(base, curve, phase);
       pedal.knobs[curve.knob] = value;
       applyKnob(pedal, curve.knob, value, {
-        time: t, smooth: false, schedule: t > 0, bpm, lite: isLite,
+        time: t0 + t, smooth: false, schedule: t > 0, bpm, lite: isLite,
       });
     }
     pedal.knobs[curve.knob] = base;
@@ -698,7 +710,12 @@ export async function renderOffline(options) {
   for (let i = 0; i < built.length; i++) {
     const pedal = built[i];
     graph.applyAll(pedal, bpm, 0, false, options.lite);
-    if (pedal.curve) graph.scheduleCurve(pedal, pedal.curve, bpm, options.duration, options.lite);
+    if (pedal.curve) {
+      graph.scheduleCurve(
+        pedal, pedal.curve, bpm, options.duration, options.lite,
+        options.phaseOrigin || 0, 0, options.loop || null,
+      );
+    }
   }
   const left = options.left;
   const right = options.right || left;

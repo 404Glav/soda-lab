@@ -14,6 +14,9 @@
     <button id="stop" type="button">Stop</button>
     <button id="play" type="button">Play</button>
     <button id="seek0" type="button">Seek 0</button>
+    <button id="playing" type="button">Is playing?</button>
+    <button id="loop" type="button">Loop 0–2</button>
+    <button id="looptoggle" type="button">Toggle loop</button>
   </p>
   <p>
     <input id="file" type="file" accept="audio/*,.wav,.mp3,.m4a">
@@ -57,6 +60,8 @@
     <button id="wav" type="button">Export WAV</button>
     <button id="save" type="button">Save project</button>
     <button id="load" type="button">Load last project</button>
+    <button id="delbake" type="button">Delete last bake</button>
+    <button id="delproj" type="button">Delete last project</button>
     <button id="proof" type="button">Run proof</button>
   </p>
   <pre id="log"></pre>
@@ -102,9 +107,26 @@
     SoundEngine.on('progress', (value) => log('progress ' + Number(value).toFixed(2)));
 
     document.getElementById('start').onclick = () => SoundEngine.start().then(() => log('started ' + SoundEngine.state));
-    document.getElementById('stop').onclick = () => SoundEngine.stop();
-    document.getElementById('play').onclick = () => SoundEngine.play();
+    document.getElementById('stop').onclick = () => {
+      SoundEngine.stop();
+      log('isPlaying ' + SoundEngine.isPlaying());
+    };
+    document.getElementById('play').onclick = () => {
+      SoundEngine.play();
+      log('isPlaying ' + SoundEngine.isPlaying());
+    };
     document.getElementById('seek0').onclick = () => SoundEngine.seek(0);
+    document.getElementById('playing').onclick = () => log('isPlaying ' + SoundEngine.isPlaying() + ' ' + JSON.stringify(SoundEngine.getLoop()));
+    document.getElementById('loop').onclick = () => {
+      SoundEngine.setLoop(0, 2);
+      SoundEngine.setLoopEnabled(true);
+      log('loop ' + JSON.stringify(SoundEngine.getLoop()));
+    };
+    document.getElementById('looptoggle').onclick = () => {
+      const loop = SoundEngine.getLoop();
+      SoundEngine.setLoopEnabled(!loop.enabled);
+      log('loop ' + JSON.stringify(SoundEngine.getLoop()));
+    };
     document.getElementById('file').onchange = () => {
       const file = document.getElementById('file').files[0];
       if (!file) return;
@@ -112,8 +134,10 @@
         log('loaded ' + source.name + ' ' + source.duration.toFixed(2) + 's bpm ' + source.bpm + ' ' + source.key + ' onsets ' + source.onsets.length);
       }).catch((err) => log(String(err.message || err)));
     };
-    document.getElementById('rec').onclick = () => SoundEngine.recordStart().then(() => log('recording'));
-    document.getElementById('recstop').onclick = () => SoundEngine.recordStop().then((source) => log('mic ' + source.duration.toFixed(2) + 's'));
+    document.getElementById('rec').onclick = () => {
+      SoundEngine.recordStart().then((value) => log('recordStart resolved ' + String(value)));
+    };
+    document.getElementById('recstop').onclick = () => SoundEngine.recordStop().then((source) => log('mic source ' + source.id + ' ' + source.duration.toFixed(2) + 's'));
 
     document.querySelectorAll('[data-add]').forEach((button) => {
       button.onclick = () => {
@@ -181,7 +205,15 @@
     });
     document.getElementById('load').onclick = () => {
       if (!lastProject) return;
-      SoundEngine.loadProject(lastProject).then(() => log('loaded ' + lastProject));
+      SoundEngine.loadProject(lastProject).then(() => log('loaded ' + lastProject + ' ' + JSON.stringify(SoundEngine.getLoop()) + ' playing ' + SoundEngine.isPlaying()));
+    };
+    document.getElementById('delbake').onclick = () => {
+      if (!lastBake) return;
+      SoundEngine.deleteBake(lastBake).then(() => log('deleted bake ' + lastBake));
+    };
+    document.getElementById('delproj').onclick = () => {
+      if (!lastProject) return;
+      SoundEngine.deleteProject(lastProject).then(() => log('deleted project ' + lastProject));
     };
     document.getElementById('proof').onclick = () => run();
 

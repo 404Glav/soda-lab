@@ -87,6 +87,7 @@ class PadProcessor extends AudioWorkletProcessor {
       if (trig !== voice.lastTrig) {
         voice.lastTrig = trig;
         this.startVoice(v, params);
+        if (voice.on) this.port.postMessage({ type: 'hit', frame: currentFrame });
       }
       if (!voice.on) continue;
       if (params['rel' + v][0] > 0.5 && voice.mode === 1 && !voice.releasing) voice.releasing = true;

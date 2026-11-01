@@ -1,11 +1,11 @@
 import { Context, getTransport, setContext } from './vendor/tone/index.js';
 import {
   PEDAL_DEFS, CURVE_PRESETS, formatKnob, clamp01, defaultKnobs, snapBars,
-  modulate, cycleSeconds,
+  cycleSeconds,
 } from './pedals.js';
 import { mulberry32 } from './rng.js';
 import { settings as storedSettings } from './storage.js';
-import { idbPut, idbGet, idbAll } from './storage.js';
+import { idbPut, idbGet, idbAll, idbDelete } from './storage.js';
 import { encodeWav24 } from './wav.js';
 import { ensureWorklets, createGraph, renderOffline } from './graph.js';
 import { renderStretch } from './stretch.js';
@@ -29,6 +29,7 @@ let bpmOverride = null;
 let keyOverride = null;
 let loopStart = 0;
 let loopEnd = 0;
+let loopEnabled = false;
 let playing = false;
 let playhead = 0;
 let startedAt = 0;
@@ -36,7 +37,6 @@ let startOffset = 0;
 let sourceNode = null;
 let projectId = null;
 let meterTimer = 0;
-let curveOn = false;
 let micStream = null;
 let micNode = null;
 const bakes = new Map();
@@ -45,6 +45,7 @@ for (let i = 0; i < 16; i++) voices.push({ busy: false, pad: -1, mode: 0 });
 let voiceCursor = 0;
 const bufWait = {};
 let bufSeq = 1;
+const hitFrames = [];
 let pads = blankPads();
 let analyzeQueue = Promise.resolve();
 
@@ -305,7 +306,8 @@ async function storeChannels(info) {
 function wirePadPort() {
   graph.padNode.port.onmessage = (event) => {
     const data = event.data || {};
-    if (data.type === 'end' && voices[data.voice]) voices[data.voice].busy = false;
+    if (data.type === 'hit' && Number.isFinite(data.frame)) hitFrames.push(data.frame);
+    else if (data.type === 'end' && voices[data.voice]) voices[data.voice].busy = false;
     else if (data.type === 'buf-ack' && bufWait[data.id]) {
       const done = bufWait[data.id];
       delete bufWait[data.id];
@@ -336,24 +338,39 @@ function sliceSource(start, end) {
   return { left: current.left.slice(a, b), right: current.right.slice(a, b) };
 }
 
-function curveFrame() {
-  if (graph && ctx && state === 'running') {
-    const now = ctx.currentTime;
-    const bpm = tempo();
-    for (let i = 0; i < order.length; i++) {
-      const pedal = order[i];
-      if (!pedal.curve || !pedal.audio) continue;
-      const cycle = cycleSeconds(pedal.curve.bars, bpm);
-      const t = playing ? position() : now;
-      const phase = cycle > 0 ? ((t % cycle) + cycle) % cycle / cycle : 0;
-      const scale = pedal.type === 'sweep' && pedal.curve.knob !== 'curve' ? pedal.knobs.curve : 1;
-      const value = modulate(pedal.knobs[pedal.curve.knob] || 0, pedal.curve, phase, scale);
-      graph.applyKnob(pedal.audio, pedal.curve.knob, value, {
-        time: now, smooth: true, bpm, lite,
-      });
-    }
+function loopState() {
+  return { start: loopStart, end: loopEnd, enabled: !!loopEnabled };
+}
+
+function loopOn() {
+  return !!(loopEnabled && loopEnd > loopStart);
+}
+
+function applyLoopToSource() {
+  if (!sourceNode || !current) return;
+  const looping = loopOn();
+  sourceNode.loop = looping;
+  if (looping) {
+    sourceNode.loopStart = loopStart;
+    sourceNode.loopEnd = Math.min(loopEnd, current.duration);
   }
-  if (curveOn) requestAnimationFrame(curveFrame);
+}
+
+/** Same bar grid the offline bake uses, written into AudioParams ahead of time. */
+function scheduleLiveCurves(audioTime, origin, duration) {
+  if (!graph || !ctx) return;
+  const when = audioTime == null ? ctx.currentTime : audioTime;
+  const pos = origin == null ? position() : origin;
+  const horizon = duration == null ? 8 : duration;
+  const bpm = tempo();
+  const loop = loopState();
+  for (let i = 0; i < order.length; i++) {
+    const pedal = order[i];
+    if (!pedal.curve || !pedal.audio) continue;
+    pedal.audio.knobs = pedal.knobs;
+    pedal.audio.curve = pedal.curve;
+    graph.scheduleCurve(pedal.audio, pedal.curve, bpm, horizon, lite, pos, when, loop);
+  }
 }
 
 const meterL = new Float32Array(256);
@@ -397,7 +414,7 @@ function position() {
   const elapsed = Math.max(0, ctx.currentTime - startedAt);
   let p = startOffset + elapsed;
   const end = current ? current.duration : 0;
-  if (loopEnd > loopStart && end) {
+  if (loopOn() && end) {
     const loopB = Math.min(loopEnd, end);
     const span = loopB - loopStart;
     if (span > 0 && startOffset < loopB && p >= loopB) {
@@ -481,10 +498,6 @@ const api = {
         if (pads[i].playL) await installPad(pads[i]);
       }
       if (!meterTimer) meterTimer = setInterval(meter, 33);
-      if (!curveOn) {
-        curveOn = true;
-        requestAnimationFrame(curveFrame);
-      }
       if (current && current.sampleRate !== ctx.sampleRate) await adopt(current);
     }
     await ctx.resume();
@@ -533,6 +546,7 @@ const api = {
     micNode.connect(graph.micCapture);
     graph.micCapture.connect(graph.sink);
     await portCall(graph.micCapture, { type: 'start' }, 'started');
+    return undefined;
   },
   async recordStop() {
     if (!graph || !graph.micCapture) throw fail('mic_denied', 'Microphone is not recording.');
@@ -570,6 +584,7 @@ const api = {
     bpmOverride = Math.max(20, Math.min(300, n));
     try { if (toneCtx) getTransport().bpm.value = bpmOverride; } catch { /* */ }
     refreshKnobs();
+    scheduleLiveCurves();
   },
   setKey(value) {
     keyOverride = String(value || '');
@@ -595,13 +610,15 @@ const api = {
     const node = ctx.createBufferSource();
     node.buffer = buffer;
     node.connect(graph.input);
-    const loopOn = loopEnd > loopStart;
-    node.loop = loopOn;
-    if (loopOn) {
+    const looping = loopOn();
+    node.loop = looping;
+    if (looping) {
       node.loopStart = loopStart;
       node.loopEnd = Math.min(loopEnd, current.duration);
     }
     node.start(when, offset);
+    const remain = Math.max(0.1, current.duration - offset);
+    scheduleLiveCurves(when, offset, looping ? Math.max(remain, 8) : remain);
     sourceNode = node;
     startedAt = when;
     startOffset = offset;
@@ -614,13 +631,13 @@ const api = {
     node.onended = () => {
       if (sourceNode !== node) return;
       playing = false;
-      if (!node.loop) playhead = loopEnd > loopStart ? loopStart : 0;
+      if (!node.loop) playhead = loopOn() ? loopStart : 0;
     };
   },
   stop() {
     halt();
     playing = false;
-    playhead = loopEnd > loopStart ? loopStart : 0;
+    playhead = loopOn() ? loopStart : 0;
     try { getTransport().pause(); } catch { /* */ }
   },
   seek(sec) {
@@ -634,11 +651,19 @@ const api = {
   setLoop(startSec, endSec) {
     loopStart = Math.max(0, Number(startSec) || 0);
     loopEnd = Math.max(loopStart, Number(endSec) || 0);
-    if (sourceNode && current) {
-      sourceNode.loop = loopEnd > loopStart;
-      sourceNode.loopStart = loopStart;
-      sourceNode.loopEnd = Math.min(loopEnd, current.duration);
-    }
+    applyLoopToSource();
+    scheduleLiveCurves();
+  },
+  setLoopEnabled(value) {
+    loopEnabled = !!value;
+    applyLoopToSource();
+    scheduleLiveCurves();
+  },
+  getLoop() {
+    return { start: loopStart, end: loopEnd, enabled: !!loopEnabled };
+  },
+  isPlaying() {
+    return !!playing;
   },
   position,
   getChain() {
@@ -729,6 +754,8 @@ const api = {
         graph.applyKnob(pedal.audio, key, pedal.knobs[key], {
           time: ctx.currentTime, smooth: true, bpm: tempo(), lite,
         });
+      } else {
+        scheduleLiveCurves();
       }
     }
     emit('chain', api.getChain());
@@ -754,6 +781,7 @@ const api = {
       pedal.audio.curve = pedal.curve;
       pedal.audio.knobs = pedal.knobs;
       graph.applyAll(pedal.audio, tempo(), ctx.currentTime, true, lite);
+      scheduleLiveCurves();
     }
     emit('chain', api.getChain());
   },
@@ -903,6 +931,7 @@ const api = {
       right = new Float32Array(left.length);
       duration = left.length / sr;
     }
+    const regionStart = what !== 'pads' && loopEnd > loopStart ? loopStart : 0;
     const rendered = await renderOffline({
       sampleRate: sr,
       duration,
@@ -912,6 +941,8 @@ const api = {
       bpm: tempo(),
       seed,
       lite,
+      phaseOrigin: regionStart,
+      loop: loopState(),
       onProgress: (value) => emit('progress', value),
     });
     const outL = rendered.buffer.getChannelData(0).slice();
@@ -972,7 +1003,9 @@ const api = {
       sourceId: current ? current.id : null,
       chain: api.getChain(),
       pads: viewPads(),
-      loop: { start: loopStart, end: loopEnd },
+      loop: { start: loopStart, end: loopEnd, enabled: !!loopEnabled },
+      bpmOverride,
+      keyOverride,
       seed,
     };
     try {
@@ -998,10 +1031,13 @@ const api = {
     if (!rec) throw new Error('Unknown project.');
     projectId = rec.id;
     if (rec.seed) seed = rec.seed;
-    loopStart = rec.loop ? rec.loop.start : 0;
-    loopEnd = rec.loop ? rec.loop.end : 0;
-    bpmOverride = rec.bpm;
-    keyOverride = rec.key || '';
+    loopStart = rec.loop ? Number(rec.loop.start) || 0 : 0;
+    loopEnd = rec.loop ? Number(rec.loop.end) || 0 : 0;
+    loopEnabled = !!(rec.loop && rec.loop.enabled);
+    if (Object.prototype.hasOwnProperty.call(rec, 'bpmOverride')) bpmOverride = rec.bpmOverride;
+    else bpmOverride = rec.bpm == null ? null : rec.bpm;
+    if (Object.prototype.hasOwnProperty.call(rec, 'keyOverride')) keyOverride = rec.keyOverride;
+    else keyOverride = rec.key == null ? null : rec.key;
     if (rec.sourceId) {
       const src = await idbGet('sources', rec.sourceId);
       if (src) await adopt(src);
@@ -1064,9 +1100,35 @@ const api = {
         pad.ready = true;
       }
     }
+    try { if (toneCtx) getTransport().bpm.value = tempo(); } catch { /* */ }
+    scheduleLiveCurves();
     emit('chain', api.getChain());
     emit('pads', viewPads());
     return projectId;
+  },
+  async deleteProject(id) {
+    const rec = await idbGet('projects', id);
+    if (!rec) return false;
+    const projects = await idbAll('projects');
+    const baked = await idbAll('bakes');
+    for (let i = 0; i < baked.length; i++) {
+      if (baked[i].projectId === id) {
+        await idbDelete('bakes', baked[i].id);
+        bakes.delete(baked[i].id);
+      }
+    }
+    if (rec.sourceId) {
+      const shared = projects.some((row) => row.id !== id && row.sourceId === rec.sourceId);
+      if (!shared) await idbDelete('sources', rec.sourceId);
+    }
+    await idbDelete('projects', id);
+    if (projectId === id) projectId = null;
+    return true;
+  },
+  async deleteBake(id) {
+    await idbDelete('bakes', id);
+    bakes.delete(id);
+    return true;
   },
   async listBakes() {
     const rows = await idbAll('bakes');
@@ -1089,6 +1151,11 @@ const api = {
   _glitch(command) {
     if (!graph || !graph.glitch) return Promise.resolve(null);
     return portCall(graph.glitch, { type: command || 'read' }, 'glitch');
+  },
+  _takeHits() {
+    const frames = hitFrames.slice();
+    hitFrames.length = 0;
+    return frames;
   },
 };
 
@@ -1219,14 +1286,19 @@ function randomCuts(chopSeed, bpm, duration) {
   return out;
 }
 
+function padIsEmpty(pad) {
+  if (!pad || !(pad.end > pad.start)) return true;
+  if (!pad.playL || pad.playL.length < 2) return true;
+  return false;
+}
+
 function sequencePads(sr) {
   let frames = 0;
   const list = [];
   for (let i = 0; i < pads.length; i++) {
-    if (pads[i].playL && pads[i].playL.length > 1) {
-      list.push(pads[i]);
-      frames += pads[i].playL.length;
-    }
+    if (padIsEmpty(pads[i])) continue;
+    list.push(pads[i]);
+    frames += pads[i].playL.length;
   }
   if (!frames) {
     const n = Math.max(1, Math.ceil(sr * 0.2));

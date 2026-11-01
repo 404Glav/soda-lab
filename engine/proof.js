@@ -250,6 +250,7 @@ export async function runProof(options) {
   SoundEngine.keyboard(1, -5);
   say('pad ready during render ' + readyDuring + ' after ' + readyAfter);
   out.checks.pads = { readyDuring, readyAfter, count: pads.length };
+  out.checks.trigger = await measureTrigger(say);
 
   const wavBlob = await SoundEngine.exportWav(baked.id);
   const wavInfo = parseWav(await wavBlob.arrayBuffer());
@@ -265,9 +266,14 @@ export async function runProof(options) {
   };
   SoundEngine.setBpm(97);
   SoundEngine.setKey('F# minor');
+  SoundEngine.setLoop(0.2, 1.25);
+  SoundEngine.setLoopEnabled(true);
   if (SoundEngine.getChain()[0]) SoundEngine.setKnob(SoundEngine.getChain()[0].id, 'mix', 0.42);
   const savedId = await SoundEngine.saveProject({ name: 'Proof project' });
   SoundEngine.setBpm(140);
+  SoundEngine.setKey('D major');
+  SoundEngine.setLoop(0, 0.1);
+  SoundEngine.setLoopEnabled(false);
   SoundEngine.setKnob(SoundEngine.getChain()[0].id, 'mix', 0.1);
   await SoundEngine.loadProject(savedId);
   const restored = SoundEngine.getChain()[0];
@@ -279,7 +285,8 @@ export async function runProof(options) {
   const bakes = await SoundEngine.listBakes();
   const projectsAfter = await SoundEngine.listProjects();
   const listedAfter = projectsAfter.filter((row) => row.id === savedId)[0];
-  say('project restored mix ' + (restored && restored.knobs.mix) + ' bakes ' + (listedAfter && listedAfter.bakeCount));
+  const loop = SoundEngine.getLoop();
+  say('project restored mix ' + (restored && restored.knobs.mix) + ' bakes ' + (listedAfter && listedAfter.bakeCount) + ' loop ' + JSON.stringify(loop));
   out.checks.project = {
     id: projectId,
     sameId: projectId === savedId,
@@ -289,7 +296,12 @@ export async function runProof(options) {
     linkedBake: bakes.filter((row) => row.id === linked.id)[0] || null,
     sourceReload: reloaded && reloaded.duration > 0 && reloaded.peaks && reloaded.peaks.length === 4096,
     before,
+    loop,
+    restoredBpm: reloaded && reloaded.bpm,
+    restoredKey: reloaded && reloaded.key,
+    isPlaying: SoundEngine.isPlaying(),
   };
+  out.checks.deletes = await checkDeletes(say, savedId, reloaded.id, linked.id);
 
   const chainFullErrors = [];
   const onErr = (e) => chainFullErrors.push(e.code);
@@ -301,11 +313,17 @@ export async function runProof(options) {
   SoundEngine.off('error', onErr);
   out.checks.chainFull = { count: SoundEngine.getChain().length, seventh, errors: chainFullErrors, ids };
 
+  out.checks.sweepCurve = await checkSweepCurve(say, sr);
   try {
-    await SoundEngine.recordStart();
+    const started = await SoundEngine.recordStart();
     await sleep(280);
     const mic = await SoundEngine.recordStop();
-    out.checks.mic = { duration: mic.duration, peaks: mic.peaks.length, sessionBack: sessionType() };
+    out.checks.mic = {
+      duration: mic.duration,
+      peaks: mic.peaks.length,
+      sessionBack: sessionType(),
+      recordStartUndefined: started === undefined,
+    };
     say('mic ' + mic.duration.toFixed(3) + 's session ' + sessionType());
   } catch (err) {
     out.checks.mic = { error: String(err && err.message || err) };
@@ -343,6 +361,7 @@ async function stress(say, sr) {
   SoundEngine.setKnob(ids[4], 'mix', 0.4);
   SoundEngine.setKnob(ids[5], 'mix', 0.55);
   SoundEngine.setLoop(0, 2);
+  SoundEngine.setLoopEnabled(true);
   await SoundEngine._glitch('reset');
   const ctx = SoundEngine._context();
   const capacity = hookCapacity(ctx);
@@ -771,6 +790,103 @@ function read24(view, offset) {
   let n = b0 | (b1 << 8) | (b2 << 16);
   if (n & 0x800000) n |= ~0xffffff;
   return n / 0x800000;
+}
+
+async function measureTrigger(say) {
+  SoundEngine._takeHits();
+  const audio = SoundEngine._context();
+  const rate = audio.sampleRate;
+  const deltas = [];
+  for (let n = 0; n < 5; n++) {
+    const t0 = audio.currentTime;
+    SoundEngine.trigger(0);
+    await sleep(70);
+    const frames = SoundEngine._takeHits();
+    if (frames.length) deltas.push((frames[0] / rate - t0) * 1000);
+  }
+  deltas.sort((a, b) => a - b);
+  const medianMs = deltas.length ? deltas[deltas.length >> 1] : null;
+  say('trigger to first sample ms ' + (medianMs == null ? 'none' : medianMs.toFixed(2)) + ' n=' + deltas.length);
+  return { deltasMs: deltas, medianMs, voices: 'worklet pool' };
+}
+
+async function checkSweepCurve(say, rate) {
+  const noise = makeNoise(rate, 2);
+  const file = new File([encodeWav16([noise, noise], rate)], 'sweep-curve.wav', { type: 'audio/wav' });
+  await SoundEngine.loadFile(file);
+  await clearChain();
+  SoundEngine.setBpm(120);
+  SoundEngine.setLoop(0, 0);
+  SoundEngine.setLoopEnabled(false);
+  const id = SoundEngine.addPedal('sweep');
+  SoundEngine.setKnob(id, 'mix', 1);
+  SoundEngine.setKnob(id, 'envelope', 0);
+  SoundEngine.setKnob(id, 'cutoff', 0.5);
+  SoundEngine.setKnob(id, 'resonance', 0);
+  SoundEngine.setKnob(id, 'type', 0);
+  SoundEngine.setCurve(id, {
+    knob: 'cutoff',
+    points: SoundEngine.CURVE_PRESETS.ramp,
+    bars: 1,
+    amount: 1,
+  });
+  await sleep(100);
+  await SoundEngine.seek(0);
+  await SoundEngine._tap('stream', 'start');
+  const playingBefore = SoundEngine.isPlaying();
+  await SoundEngine.play();
+  const playingDuring = SoundEngine.isPlaying();
+  await sleep(2300);
+  const live = await SoundEngine._tap('stream', 'stop');
+  SoundEngine.stop();
+  const baked = await SoundEngine.bake({ seed: SoundEngine._seed(), what: 'region' });
+  const bakeCh = await channelsOf(baked.id);
+  const cmp = live && live.left ? compareLive(bakeCh.left, live.left, rate) : { db: null };
+  const earlyN = Math.floor(0.35 * rate);
+  const lateAt = Math.floor(1.55 * rate);
+  const early = band(fftMag(bakeCh.left.subarray(0, earlyN)), rate, 2500, 12000);
+  const late = band(fftMag(bakeCh.left.subarray(lateAt, lateAt + earlyN)), rate, 2500, 12000);
+  const hfDb = 20 * Math.log10((late + 1e-12) / (early + 1e-12));
+  say('sweep curve dB ' + (cmp.db == null ? 'null' : cmp.db.toFixed(3)) + ' hfDb ' + hfDb.toFixed(1) + ' playing ' + playingBefore + '/' + playingDuring);
+  return { db: cmp.db, hfDb, early, late, playingBefore, playingDuring, playingAfter: SoundEngine.isPlaying() };
+}
+
+async function checkDeletes(say, projectId, sourceId, bakeId) {
+  await putProject({
+    id: 'proj_share_test',
+    name: 'share',
+    sourceId,
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    chain: [],
+    pads: [],
+    loop: { start: 0, end: 0, enabled: false },
+    bpmOverride: null,
+    keyOverride: null,
+  });
+  await SoundEngine.deleteBake(bakeId);
+  const bakeGone = !(await SoundEngine.listBakes()).some((row) => row.id === bakeId);
+  await SoundEngine.deleteProject(projectId);
+  const projectGone = !(await SoundEngine.listProjects()).some((row) => row.id === projectId);
+  const sourceKept = (await SoundEngine.listSources()).some((row) => row.id === sourceId);
+  await SoundEngine.deleteProject('proj_share_test');
+  const sourceGone = !(await SoundEngine.listSources()).some((row) => row.id === sourceId);
+  say('delete bakeGone ' + bakeGone + ' projectGone ' + projectGone + ' sourceKept ' + sourceKept + ' sourceGone ' + sourceGone);
+  return { bakeGone, projectGone, sourceKept, sourceGone };
+}
+
+function putProject(rec) {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('soundlab', 1);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      const tx = db.transaction('projects', 'readwrite');
+      tx.objectStore('projects').put(rec);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => reject(tx.error);
+    };
+  });
 }
 
 function sleep(ms) {

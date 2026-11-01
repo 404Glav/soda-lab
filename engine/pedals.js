@@ -211,14 +211,15 @@ export function evalCurve(points, x) {
   return last[1];
 }
 
-/** Base knob plus the curve. Amount < 0 flips the shape. */
-export function modulate(base, curve, phase, depthScale) {
+/**
+ * Curve amount is -1..1 and swings around the current knob.
+ * amount 0 leaves the knob where it is.
+ * value = clamp(knob + amount * (curveY - 0.5) * 2, 0, 1)
+ */
+export function modulate(base, curve, phase) {
   const y = evalCurve(curve.points, phase);
-  const shaped = curve.amount >= 0 ? y : 1 - y;
-  let depth = Math.min(1, Math.abs(Number(curve.amount) || 0));
-  if (typeof depthScale === 'number') depth *= clamp01(depthScale);
-  const v = clamp01(base) * (1 - depth) + clamp01(shaped) * depth;
-  return clamp01(v);
+  const amount = Math.max(-1, Math.min(1, Number(curve.amount) || 0));
+  return clamp01((Number(base) || 0) + amount * (y - 0.5) * 2);
 }
 
 export function cycleSeconds(bars, bpm) {

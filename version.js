@@ -1,2 +1,2 @@
-/* Soda Lab version. Read by the page and by sw.js via importScripts. */
-self.SODALAB_VERSION = '0.4';
+/* Sound Lab version. Read by sw.js via importScripts. Bump to drop the old shell. */
+self.SOUNDLAB_VERSION = '1.0';

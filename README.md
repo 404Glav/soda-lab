@@ -1,119 +1,83 @@
-# Soda Lab
+# Sound Lab
 
-A quiet little lab for loud little drinks.
+Drop in any sound. Sculpt it into candy.
 
-An iOS-flavoured soda-mixing app: pick a base, stack up to three flavors, dress the bottle, brew it, and shelve the result. Every pour rolls a rarity. No frameworks, no build step — just three files and a very large amount of SVG.
+A pocket studio in a phone frame: load or record a sound, run it through a chain of
+candy pedals, chop it into 16 pads, and bake the result to a 24-bit WAV. Everything
+runs locally — audio never leaves the device.
 
 ```
 SodaLab/
-├── index.html     markup for the screens + overlays
-├── styles.css     the whole design system (tokens, cards, sheets, motion)
-├── version.js     version source of truth (page + service worker)
-├── badges.js      badge definitions, badge store, evaluator (no UI)
-├── app.js         flavor data, color blending, bottle renderer, router
-├── manifest.json  installable / standalone metadata
-├── sw.js          cache-first offline shell (cache name follows version.js)
+├── index.html        markup for the screens + sheets
+├── styles.css        the whole design system (tokens, device frame, cards, sheets, motion)
+├── app.js            the UI layer: shelf, board, pads, chain, sheets, engine wiring
+├── version.js        version source of truth (service worker)
+├── manifest.json     installable / standalone metadata
+├── sw.js             cache-first offline shell (cache name follows version.js)
 ├── CHANGELOG.md
-└── icons/         favicons (ico, 16, 32), apple-touch 180, PWA 192/512 + maskable 512;
-                   badges/ holds Pixel's badge caps (<id>.svg, <id>-locked.svg, mystery.svg)
+├── icons/            favicons (ico, 16, 32), apple-touch 180, PWA 192/512 + maskable 512
+└── engine/           the audio engine (see engine/README.md)
+    ├── index.js      SoundEngine: sources, transport, chain, pads, bakes, projects
+    ├── graph.js      live pedal graph + AudioWorklet loading
+    ├── pedals.js     PEDAL_DEFS, curves, knob formatting, tempo math
+    ├── analyze.js    onsets, tempo and key
+    ├── storage.js    IndexedDB (sources, projects, bakes) + settings
+    ├── stretch.js    Signalsmith Stretch wrapper
+    ├── wav.js        16/24-bit WAV encoding
+    ├── worklets/     capture, pad, prism, glitch, crusher, envelope processors
+    ├── workers/      analysis worker
+    └── vendor/       Tone.js, Meyda, Signalsmith Stretch
 ```
 
 ## Run it
 
-Double-click `index.html`, or serve the folder:
+AudioWorklet needs a secure context, so `file://` will not boot. Serve the folder:
 
 ```bash
-npx serve .
-# or
-python -m http.server 8080
+python -m http.server 5190
 ```
 
-Then open `http://localhost:8080`. On a phone, use the local network URL and
+Then open `http://127.0.0.1:5190`. On a phone, use the local network URL and
 "Add to Home Screen" — it launches standalone, full-bleed, with no browser chrome.
 
 > Desktop shows the app inside a phone frame; below 520px it goes full-screen.
 
 ## What's in it
 
-**Lab** — a hero card that reflects whatever is currently in the glass, your shelf,
-and a flavor of the day that rotates on a daily seed.
+**Boot** — tap to start the audio context. Browsers require a gesture, so this is
+the only gate between you and the engine.
 
-**Mixer** — four bases, thirty-six flavors, six-step sweetness and fizz dials, three
-serving temperatures. The bottle re-renders live: liquid color is blended in HSL
-so it stays luminous instead of turning to mud, and bubble count follows the fizz
-setting.
+**Shelf** — everything you have made, filtered by Bakes, Chops and Chains. Bakes
+open a detail sheet (play, download, delete); sources reopen in the board; projects
+restore the chain, pads and loop.
 
-**Style** — cosmetic only. Six liquid finishes (Clear, Glitter, Pearl, Aurora,
-Cosmic, Ember) and twelve charms you can place anywhere on the bottle. Tap to
-add, drag to move, tap a placed charm to remove. Finishes and charms tilt the
-rarity odds, they don't change the taste.
+**Board** — the waveform, a Chain/Pads switch, and the transport. Tap the waveform
+to seek. The Chain pane is the pedal rail; tap a pedal to edit it, or add one of
+six types: Prism (grain delay), Reel (tape echo), Cathedral (hall reverb), Fizz
+(saturator), Crusher (bit crush) and Sweep (auto filter).
 
-**Brew** — a full-screen pour: the liquid rises, four stages tick past, and the
-batch gets sealed. Rarity is rolled when the bottle is sealed, not before.
+**Pads** — the sound chopped into 16 slices. Find scores onsets, Slice cuts on the
+bar, Random shuffles the cuts, Tap sets the tempo by tapping. Press a pad to fire
+it; hold it to open the pad editor (level, key, stretch, reverse, trigger/hold,
+favorite). Favorites survive re-chops.
 
-**Result** — a generated name (with easter-egg combos like *Cherry Cola* and
-*Root Beer Float*), a rarity badge and a 40–99 score, tasting notes derived from
-the flavor profile, five profile bars, save-to-shelf, and a copyable recipe.
+**Chain** — the same chain as a list, with bypass state and a live knob summary.
 
-**Shelf** — saved batches as bottle cards, each tagged with its rarity. Tap one
-for details, remix it, merge it with another, or remove it.
+**Bake & export** — print the chain offline, either the loop region or the pads in
+order, with an optional effect tail. Download the WAV or save the project to the
+shelf. Projects keep the source, chain, pads, loop, BPM and key.
 
-**Merge** — fuse any two shelf bottles into a third. Flavors, sweetness, fizz,
-finish and charms combine (three flavors, six charms max). The originals stay.
-Merged batches roll with better rarity odds.
+Only real engine parameters are exposed in the UI. Every knob maps to a value in
+`engine/pedals.js`; nothing is decorative.
 
-**Flavors** — the pantry: searchable, each with notes, a description, and a
-one-tap "add to mix".
+## Privacy
 
-Everything persists to `localStorage` under `sodalab.v1` (drafts included), so a
-half-finished mix survives a refresh. Older saves pick up a rarity the first time
-they're loaded.
+Sources, projects and bakes live in IndexedDB under the `soundlab` database. The
+microphone is only opened while recording. There is no account, no upload and no
+analytics.
 
-## Rarity
+## Credits
 
-Rolled once, at brew time, from a weighted table. Finishes, charms, a full
-three-flavor mix, and merging all raise the odds of the higher tiers.
-
-| Rank | Base odds |
-| --- | --- |
-| Common | 1 in 2 |
-| Uncommon | 1 in 4 |
-| Rare | 1 in 7 |
-| Epic | 1 in 15 |
-| Legendary | 1 in 50 |
-| Mythic | 1 in 200 |
-
-The score is separate: harmony of the flavor profile, plus small bonuses for
-rarity, finish and charms.
-
-## Deep links
-
-| URL | Opens |
-| --- | --- |
-| `#/mix` | the mixer |
-| `#/shelf` | your shelf |
-| `#/flavors` | the pantry |
-| `#/result` | a result screen (synthesises one if empty) |
-| `?demo=1` | seeds four dressed example batches |
-
-## Design notes
-
-- System type stack (`-apple-system` / SF Pro), tight tracking, `-0.035em` on titles.
-- Warm paper background `#F5F4F1` with a barely-there grain overlay.
-- Cards are white with a 1px hairline shadow; nothing has a visible border.
-- Motion uses one easing curve — `cubic-bezier(.32,.72,0,1)` — for pushes, sheets,
-  and the brew overlay. Everything respects `prefers-reduced-motion`.
-- Color is never hardcoded in the UI: it's derived from the drink, then checked for
-  luminance so button labels always stay readable.
-- The bottle is one SVG: a depth gradient in the liquid, a left highlight, a rim
-  catch, a ridged cap, and a colored contact shadow. Finishes and charms sit on
-  top of that, never inside the flavor math.
-
-## Releasing
-
-`version.js` is the only version number. Versions are two-part, `MAJOR.MINOR`, with no patch number: `0.1`, `0.2`, `0.3`, `0.4`, then `0.5`. The page and the service worker both read `SODALAB_VERSION`, and the worker caches the shell as `sodalab-` plus that version (`sodalab-0.4` today). On activate it deletes older `sodalab-*` caches, so you do not edit a cache name by hand.
-
-1. Bump `version.js` to the next two-part version (`0.5`, `0.6`, and so on).
-2. Add a `CHANGELOG.md` entry for that version.
-3. Merge to `main`.
-4. Tag `vX.Y` on `main` (`v0.4`, `v0.5`, and so on).
+Engine built on [Tone.js](https://tonejs.github.io/), [Meyda](https://meyda.js.org/)
+and [Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch),
+vendored under `engine/vendor/` with their licenses.

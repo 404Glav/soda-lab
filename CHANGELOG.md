@@ -7,6 +7,22 @@ Versions are two-part numbers, `MAJOR.MINOR`, with no patch component (`0.4`).
 
 ## [Unreleased]
 
+### Added
+
+- Sound Lab replaces Soda Lab: a real UI over `engine/`, with a boot screen, Shelf, Board, Pads and Chain views, plus sheets for loading, pedals, pads, bake/export and projects.
+- Six pedal artworks (Prism, Reel, Cathedral, Fizz, Crusher, Sweep) drawn as SVG, with bypass state.
+- Waveform rendering from `source.peaks`, chop overlays on the pads view, and a draggable curve editor wired to `setCurve`/`curvePhase`.
+
+### Changed
+
+- `app.js` is now an ES module importing `engine/index.js`; the engine also exposes `window.SoundEngine`.
+- `version.js` exports `SOUNDLAB_VERSION`; the service worker cache is `soundlab-` plus that version and precaches the engine, worklets and vendors.
+- `manifest.json` and `README.md` describe Sound Lab.
+
+### Removed
+
+- `badges.js` and `icons/badges/` (soda-specific, no longer referenced).
+
 ## [0.4] - 2026-10-31
 
 ### Added

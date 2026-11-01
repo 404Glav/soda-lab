@@ -1,7 +1,7 @@
 {
-  "name": "Soda Lab",
-  "short_name": "Soda Lab",
-  "description": "A quiet little lab for loud little drinks. Mix, brew and shelf your own sodas.",
+  "name": "Sound Lab",
+  "short_name": "Sound Lab",
+  "description": "Drop in any sound. Sculpt it into candy. A pocket studio of candy pedals.",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",

@@ -1,19 +1,38 @@
-/* Soda Lab service worker: cache-first app shell.
-   The cache name is sodalab- plus SODALAB_VERSION. Bump version.js to drop
+/* Sound Lab service worker: cache-first app shell.
+   The cache name is soundlab- plus SOUNDLAB_VERSION. Bump version.js to drop
    the previous shell. version.js itself is never answered from an old
-   sodalab-* cache: the next worker imports it, and its install precaches
+   soundlab-* cache: the next worker imports it, and its install precaches
    it, while this worker may still be the one handling fetches. */
 importScripts('./version.js');
 
-const CACHE = 'sodalab-' + SODALAB_VERSION;
+const CACHE = 'soundlab-' + SOUNDLAB_VERSION;
 const SHELL = [
   './',
   './index.html',
   './version.js',
   './styles.css',
-  './badges.js',
   './app.js',
   './manifest.json',
+  './engine/index.js',
+  './engine/pedals.js',
+  './engine/rng.js',
+  './engine/storage.js',
+  './engine/wav.js',
+  './engine/graph.js',
+  './engine/ir.js',
+  './engine/stretch.js',
+  './engine/analyze.js',
+  './engine/workers/analysis-worker.js',
+  './engine/worklets/capture-processor.js',
+  './engine/worklets/crusher-processor.js',
+  './engine/worklets/envelope-processor.js',
+  './engine/worklets/glitch-processor.js',
+  './engine/worklets/pad-processor.js',
+  './engine/worklets/prism-processor.js',
+  './engine/vendor/tone/index.js',
+  './engine/vendor/tone/Tone.js',
+  './engine/vendor/signalsmith-stretch/SignalsmithStretch.js',
+  './engine/vendor/meyda/meyda.min.js',
   './icons/favicon.ico',
   './icons/favicon-16.png',
   './icons/favicon-32.png',
@@ -21,11 +40,6 @@ const SHELL = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/maskable-512.png',
-  './icons/badges/mystery.svg',
-  ...['first-pour', 'shelf-starter', 'lab-regular', 'full-glass', 'dressed-up', 'fully-charmed', 'encore',
-    'lucky-pour', 'epic-find', 'legend-in-a-bottle', 'mythic', 'base-tour', 'pantry-explorer',
-    'secret-recipe', 'combo-hunter', 'fusion', 'family-tree', 'flavor-of-the-day']
-    .flatMap(id => [`./icons/badges/${id}.svg`, `./icons/badges/${id}-locked.svg`]),
 ];
 
 /* Install fetches bypass the HTTP cache. A default fetch can replay the
@@ -46,7 +60,8 @@ self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
-        keys.filter(k => k.startsWith('sodalab-') && k !== CACHE).map(k => caches.delete(k))
+        keys.filter(k => (k.startsWith('soundlab-') || k.startsWith('sodalab-')) && k !== CACHE)
+          .map(k => caches.delete(k))
       ))
       .then(() => self.clients.claim())
   );

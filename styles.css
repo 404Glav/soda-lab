@@ -262,10 +262,11 @@ svg { display: block; }
   opacity: 0;
   visibility: hidden;
   transform: translateX(0) scale(.995);
+  /* the outgoing view is gone before the incoming one shows, so two never read at once */
   transition:
-    opacity .30s var(--ease),
+    opacity .12s ease-out,
     transform .48s var(--ease),
-    visibility 0s linear .48s;
+    visibility 0s linear .12s;
   will-change: transform, opacity;
 }
 .view::-webkit-scrollbar { display: none; }
@@ -274,7 +275,10 @@ svg { display: block; }
   visibility: visible;
   transform: none;
   z-index: 2;
-  transition-delay: 0s, 0s, 0s;
+  transition:
+    opacity .24s var(--ease) .12s,
+    transform .48s var(--ease),
+    visibility 0s;
 }
 .view:not(.is-active) * { animation-play-state: paused; }
 .view.enter-right { transform: translateX(34px) scale(.985); opacity: 0; }

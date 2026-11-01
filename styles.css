@@ -1415,8 +1415,9 @@ body.has-sheet .toast {
 }
 body.has-sheet .toast.is-show { transform: translate(-50%, 0); }
 
-/* keep the transport above the tab bar */
-.transport { bottom: calc(var(--tabbar-h) + 6px); z-index: 3; }
+/* keep the transport above the tab bar. Sticky offsets count from inside the
+   view's bottom padding (tab bar + 30px), so -24px lands it 6px above the bar. */
+.transport { bottom: -24px; z-index: 3; }
 
 /* resume pill: audio was suspended or interrupted */
 .resume-pill {

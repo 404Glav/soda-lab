@@ -30,15 +30,16 @@ export async function ensureWorklets(ctx) {
   loaded.add(ctx);
 }
 
-/* Small-signal loop gain. Full knob is about -1 dB per repeat. The power
-   curve puts the halfway mark near 5 repeats (-12 dB) so the top of the
-   knob is where the long trails are. */
-const FEEDBACK_MAX = 0.9;
-const FEEDBACK_SHAPE = 1.85;
+/* Worst-case loop gain at full feedback. A 1.6 s delay has to fall through
+   -60 dB inside 30 s, which is about -4.4 dB per repeat. */
+const FEEDBACK_MAX = 0.64;
+/* Chrome's lowpass biquad peaks +1.74 dB below the cutoff even at Butterworth Q.
+   That peak sits in the feedback loop, so a coefficient near 0.9 was really
+   about 1.1 at the resonant frequency and the echo grew. Trim it back to unity. */
+const LOWPASS_TRIM = 1 / Math.pow(10, 1.8 / 20);
 
 function feedbackGain(v) {
-  const x = clamp01(v);
-  return FEEDBACK_MAX * Math.pow(x, FEEDBACK_SHAPE);
+  return FEEDBACK_MAX * clamp01(v);
 }
 const DRIVE = makeCurve(2048, (x) => Math.tanh(x * 2.2));
 const FUZZ = makeCurve(2048, (x) => {
@@ -131,11 +132,17 @@ function shaper(ctx, curve, oversample) {
   return node;
 }
 
-function biquad(ctx, type, freq) {
+function biquad(ctx, type, freq, q) {
   const node = ctx.createBiquadFilter();
   node.type = type;
+  const now = ctx.currentTime || 0;
+  const Q = q == null ? 0.70710678118 : q;
   node.frequency.value = freq;
-  node.Q.value = 0.707;
+  node.Q.value = Q;
+  try {
+    node.frequency.setValueAtTime(freq, now);
+    node.Q.setValueAtTime(Q, now);
+  } catch { /* the value above already took */ }
   return node;
 }
 
@@ -330,6 +337,7 @@ export function createGraph(ctx, toneCtx, options) {
           writeAt(n.flutter.lfo.frequency, 6 + v * 7, time, smooth, schedule);
         } else if (key === 'age') {
           writeAt(p.ageFreq, logMap(1 - v, 700, 12000), time, smooth, schedule);
+          writeAt(p.ageQ, 0.70710678118, time, false, schedule);
           const curves = ageCurves(1 + v * 7);
           n.clipWet.curve = curves.wet;
           n.clipFb.curve = curves.fb;
@@ -520,9 +528,11 @@ export function createGraph(ctx, toneCtx, options) {
     const delay = ctx.createDelay(3);
     delay.delayTime.value = 0.25;
     const lowpass = biquad(ctx, 'lowpass', 6000);
+    const loopTrim = ctx.createGain();
+    loopTrim.gain.value = LOWPASS_TRIM;
     const curves = ageCurves(1 + (pedal.knobs.age || 0) * 7);
     const clipWet = shaper(ctx, curves.wet, '2x');
-    const clipFb = shaper(ctx, curves.fb, '2x');
+    const clipFb = shaper(ctx, curves.fb, 'none');
     const feedback = ctx.createGain();
     feedback.gain.value = 0.3;
     const wow = makeModulator(toneCtx, ctx, 0.4);
@@ -531,19 +541,21 @@ export function createGraph(ctx, toneCtx, options) {
     sum.connect(delay);
     delay.connect(lowpass);
     lowpass.connect(clipWet);
-    lowpass.connect(clipFb);
+    lowpass.connect(loopTrim);
+    loopTrim.connect(clipFb);
     clipFb.connect(feedback);
     feedback.connect(sum);
     clipWet.connect(pedal.wet.input);
     wow.node.connect(delay.delayTime);
     flutter.node.connect(delay.delayTime);
-    pedal.nodes = { delay, lowpass, clipWet, clipFb, feedback, wow, flutter, lfos: [wow.lfo, flutter.lfo] };
+    pedal.nodes = { delay, lowpass, loopTrim, clipWet, clipFb, feedback, wow, flutter, lfos: [wow.lfo, flutter.lfo] };
     pedal.params = {
       delay: delay.delayTime,
       feedback: feedback.gain,
       wow: wow.depth,
       flutter: flutter.depth,
       ageFreq: lowpass.frequency,
+      ageQ: lowpass.Q,
     };
     pedals.push(pedal);
     return pedal;

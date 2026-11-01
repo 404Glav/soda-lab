@@ -59,6 +59,9 @@ class PrismProcessor extends AudioWorkletProcessor {
     this.bufL = new Float32Array(this.length);
     this.bufR = new Float32Array(this.length);
     this.write = 0;
+    this.absWrite = 0;
+    this.frozenHistory = 0;
+    this.holding = false;
     this.prevL = 0;
     this.prevR = 0;
     this.fbScale = 0;
@@ -91,6 +94,9 @@ class PrismProcessor extends AudioWorkletProcessor {
     this.bufL.fill(0);
     this.bufR.fill(0);
     this.write = 0;
+    this.absWrite = 0;
+    this.frozenHistory = 0;
+    this.holding = false;
     this.prevL = 0;
     this.prevR = 0;
     this.wait = 1;
@@ -115,8 +121,9 @@ class PrismProcessor extends AudioWorkletProcessor {
     return this.bag.pop();
   }
 
-  spawn(grainSec, pitchMode, reverse, voiceCap) {
+  spawn(grainSec, pitchMode, reverse, voiceCap, history, frozen) {
     const cap = Math.max(1, Math.min(16, voiceCap | 0));
+    if (history < 16) return;
     let voice = null;
     for (let i = 0; i < cap; i++) {
       if (!this.voices[i].on) {
@@ -137,15 +144,34 @@ class PrismProcessor extends AudioWorkletProcessor {
       }
     }
     const ratio = this.takeRatio(pitchMode | 0);
-    const life = Math.max(8, Math.min(sampleRate * 0.45, grainSec * sampleRate));
-    const delay = Math.max(life, grainSec * sampleRate);
-    const jitter = (this.rand() - 0.5) * delay * 0.2;
     const dir = reverse > 0.5 ? -1 : 1;
+    const step = ratio * dir;
+    // Wobble can speed the read by about 10%. Size the grain for that.
+    const guard = 1.12;
+    const worstStep = step >= 0 ? step * guard : step * guard;
+    let life = Math.max(8, Math.min(sampleRate * 0.45, grainSec * sampleRate));
+    const margin = 4;
+    const hist = Math.max(margin + 8, history);
+    let startBehind = Math.max(life, Math.min(hist - margin, grainSec * sampleRate));
+    const jitter = (this.rand() - 0.5) * startBehind * 0.15;
+    startBehind = Math.max(margin + 8, Math.min(hist - margin, startBehind + jitter));
+    if (!frozen && worstStep > 1) {
+      const room = Math.max(1, startBehind - margin);
+      life = Math.min(life, room / (worstStep - 1));
+    } else if (!frozen && worstStep < 1) {
+      const grow = 1 - worstStep;
+      if (grow > 0) life = Math.min(life, Math.max(0, (hist - startBehind) / grow));
+    } else if (frozen && worstStep > 0) {
+      life = Math.min(life, Math.max(0, (startBehind - margin) / worstStep));
+    } else if (frozen && worstStep < 0) {
+      life = Math.min(life, Math.max(0, (hist - startBehind) / -worstStep));
+    }
+    if (!(life >= 8)) return;
     voice.on = true;
-    voice.life = life;
+    voice.life = life | 0;
     voice.age = 0;
-    voice.step = ratio * dir;
-    voice.pos = this.write - delay + jitter;
+    voice.step = step;
+    voice.pos = this.absWrite - startBehind;
     this.spawns++;
   }
 
@@ -179,17 +205,25 @@ class PrismProcessor extends AudioWorkletProcessor {
       const inSampleL = inL[i] || 0;
       const inSampleR = inR[i] || 0;
       const incoming = Math.abs(inSampleL) + Math.abs(inSampleR) > 1e-5;
-      let advance = true;
-      if (!freeze || incoming) {
+      const capturing = !freeze || incoming;
+      if (capturing) {
         const scale = freeze ? 0 : (this.fbScale || 0);
-        this.bufL[this.write] = inSampleL + this.prevL * scale;
-        this.bufR[this.write] = inSampleR + this.prevR * scale;
-      } else {
-        advance = false;
+        const slot = this.absWrite % this.length;
+        this.bufL[slot] = inSampleL + this.prevL * scale;
+        this.bufR[slot] = inSampleR + this.prevR * scale;
+        this.write = slot;
+        this.absWrite++;
+        this.holding = false;
+      } else if (!this.holding) {
+        this.frozenHistory = Math.max(16, Math.min(this.absWrite, this.length - 8));
+        this.holding = true;
       }
+      const history = this.holding
+        ? this.frozenHistory
+        : Math.min(this.absWrite, this.length - 8);
       this.wait -= 1;
       if (this.wait <= 0) {
-        this.spawn(grainSec, pitchMode, reverse, cap);
+        this.spawn(grainSec, pitchMode, reverse, cap, history, this.holding);
         const interval = sampleRate / Math.max(0.25, density);
         const jitter = (this.rand() - 0.5) * 0.35 * interval;
         this.wait = Math.max(1, interval + jitter);
@@ -201,6 +235,11 @@ class PrismProcessor extends AudioWorkletProcessor {
       for (let v = 0; v < cap; v++) {
         const voice = this.voices[v];
         if (!voice.on) continue;
+        const behind = this.absWrite - voice.pos;
+        if (!(behind >= 1 && behind <= history)) {
+          voice.on = false;
+          continue;
+        }
         const phase = voice.age / voice.life;
         const win = grainWindow(phase, shape);
         windowSum += win;
@@ -216,15 +255,11 @@ class PrismProcessor extends AudioWorkletProcessor {
       const norm = windowSum > 1 ? windowSum : 1;
       const wetL = Math.tanh(sumL / norm);
       const wetR = Math.tanh(sumR / norm);
-      this.fbScale = feedback > 0.9 ? 0.9 : feedback;
+      this.fbScale = feedback > 0.64 ? 0.64 : feedback;
       outL[i] = wetL;
       if (outR !== outL) outR[i] = wetR;
       this.prevL = wetL;
       this.prevR = wetR;
-      if (advance) {
-        this.write++;
-        if (this.write >= this.length) this.write = 0;
-      }
     }
     this.sampleCount += n;
     if (this.sampleCount - this.lastReport > sampleRate) {

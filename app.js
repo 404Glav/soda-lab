@@ -789,7 +789,6 @@ async function afterSource(source, opts = {}) {
   renderAll();
   go('board');
   if (opts.autoChop) {
-    for (let i = 0; i < 16; i++) E.setFavorite(i, false);
     try {
       const pads = await E.chop('find');
       S.pads = pads;
@@ -804,6 +803,11 @@ async function afterSource(source, opts = {}) {
 }
 
 async function loadSourceFlow(id) {
+  if (S.source && S.source.id === id) {
+    closeSheet(true);
+    go('board');
+    return;
+  }
   try {
     toast('Loading sound…', 5000);
     const source = await E.loadSource(id);

@@ -1077,7 +1077,8 @@ function wireReorder(host, opts) {
   const coord = (event) => (vertical ? event.clientY : event.clientX);
   const paint = (st) => {
     st.frame = 0;
-    const to = clamp(st.from + Math.round(st.d / st.step), 0, st.items.length - 1);
+    // swap once the row is a third of the way over its neighbour, so the gap opens early
+    const to = clamp(st.from + Math.trunc((st.d + Math.sign(st.d) * st.step * 0.65) / st.step), 0, st.items.length - 1);
     const move = vertical ? 'translateY(' : 'translateX(';
     st.items.forEach((el, i) => {
       let shift = 0;
@@ -1107,7 +1108,7 @@ function wireReorder(host, opts) {
     };
   });
   host.addEventListener('pointermove', (event) => {
-    if (!drag || event.pointerId !== drag.pointerId) return;
+    if (!drag || drag.done || event.pointerId !== drag.pointerId) return;
     const d = coord(event) - drag.start;
     if (!drag.on) {
       if (Math.abs(d) < 6) return;
@@ -1125,18 +1126,25 @@ function wireReorder(host, opts) {
     }
   });
   const end = (event) => {
-    if (!drag || event.pointerId !== drag.pointerId) return;
+    if (!drag || drag.done || event.pointerId !== drag.pointerId) return;
     const st = drag;
-    drag = null;
-    if (!st.on) return;
+    if (!st.on) { drag = null; return; }
+    st.done = true;
     if (st.frame) { cancelAnimationFrame(st.frame); paint(st); }
-    S.dragging = false;
     S.dragEndAt = performance.now();
-    host.classList.remove('is-sorting');
-    st.items.forEach((el) => { el.style.transform = ''; el.classList.remove('is-lifted'); });
-    S.chain = E.getChain();
-    renderChainRail();
-    renderChainList();
+    // settle the lifted row into its slot, then render the new order in place
+    st.item.classList.add('is-settling');
+    st.item.style.transform = (vertical ? 'translateY(' : 'translateX(') + (st.to - st.from) * st.step + 'px)';
+    setTimeout(() => {
+      drag = null;
+      S.dragging = false;
+      S.dragEndAt = performance.now();
+      host.classList.remove('is-sorting');
+      st.items.forEach((el) => { el.style.transform = ''; el.classList.remove('is-lifted', 'is-settling'); });
+      S.chain = E.getChain();
+      renderChainRail();
+      renderChainList();
+    }, reduceMotion ? 0 : 190);
   };
   host.addEventListener('pointerup', end);
   host.addEventListener('pointercancel', end);

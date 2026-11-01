@@ -441,9 +441,10 @@ function meter() {
   try {
     graph.analyserL.getFloatTimeDomainData(meterL);
     graph.analyserR.getFloatTimeDomainData(meterR);
-    let gr = graph.compressor.reduction || 0;
-    if (gr > 0) gr = -gr;
-    emit('meter', { l: dbfs(peakOf(meterL)), r: dbfs(peakOf(meterR)), gr });
+    let comp = graph.compressor.reduction || 0;
+    if (comp > 0) comp = -comp;
+    const lim = graph.limiterState ? graph.limiterState.reduction : 0;
+    emit('meter', { l: dbfs(peakOf(meterL)), r: dbfs(peakOf(meterR)), gr: comp + lim });
   } catch { /* analyser not ready */ }
 }
 
